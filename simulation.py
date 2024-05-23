@@ -16,7 +16,8 @@ class model:
     def step(self, c):
         self.r = self.rho*self.r+np.random.uniform(0, 0.1) #Transition function for r
         self.i = (self.i - c)*(1+self.r)                   #Transition function for i
-
+    
+    
 
         
 
