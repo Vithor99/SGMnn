@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-#Model: Agent deciding to either save or consume.
-#Next period agent receives what he saved plus an interest, determined as an AR(1) process. 
 
 class model: 
     def __init__(self, sigma, rho):
