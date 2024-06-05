@@ -17,7 +17,7 @@ class model:
     def step(self, s, c):
         s[0] = self.rho*s[0]+np.random.uniform(0, 0.1)
         s[1] = (s[1] - c)*(1+s[0])
-        U = -1 if s[1] < c else (c / self.sigma) ** (self.sigma)
+        U = -1 if s[1] < c else (c / self.sigma) ** (self.sigma) #subject to conditions
         return s, U
         # self.r = self.rho*self.r+np.random.uniform(0, 0.1) #Transition function for r
         # self.i = (self.i - c)*(1+self.r)                   #Transition function for i
