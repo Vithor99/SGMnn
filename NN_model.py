@@ -78,9 +78,9 @@ class V():
         rewards = torch.tensor([item['u'] for item in batch], dtype=torch.float32)
 
         #Checking the dimensions
-        print("states shape:", states.shape)
-        print("next states shape:", next_states.shape)
-        print("Rewards shape:", rewards.shape)
+        #print("states shape:", states.shape)
+        #print("next states shape:", next_states.shape)
+        #print("Rewards shape:", rewards.shape)
 
         # xTODO: calcola loss con Bellman
         # Compute the target values
