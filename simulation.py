@@ -19,7 +19,7 @@ class model:
         rent = s[0]*(self.alpha)*(s[1]/a[1])**(self.alpha-1)
         s[0] = self.rho*s[0]+np.random.uniform(0, 0.1) #updates tech.lvl
         s[1] = (1-self.delta)*s[1]+a[2] #updates Capital level
-        U = -1 if a[0]+a[2]>wage*a[1]+rent*a[2] else  (a[0]**(1-self.sigma))/(1-self.sigma) - (a[1]**(1+self.eta))/(1+self.eta) #reward subject to conditions
+        U = -1 if a[0]+a[2]>wage*a[1]+rent*s[1] else  (a[0]**(1-self.sigma))/(1-self.sigma) - (a[1]**(1+self.eta))/(1+self.eta) #reward subject to conditions
         return s, U
         
     
