@@ -14,7 +14,7 @@ class model:
         self.memory2_list = []
 
     def reset(self):
-        return np.array([np.random.normal(0, 0.1), np.random.normal(100,10)]) #initializes model with tech.lvl and Capital.lvl
+        return np.array([0, np.random.normal(0.1, 0.01)]) # np.random.normal(0, 0.1) #initializes model with tech.lvl and Capital.lvl
         
         
     def step(self, s, a):
@@ -26,11 +26,11 @@ class model:
             new_capital = (1-self.delta)*s[1]
             U = (production**(1-self.sigma)-1)/(1-self.sigma) - (a[1]**(1+self.eta)-1)/(1+self.eta)
         else:
-            new_capital = (1-self.delta)*s[1]+investment #updates Capital level
-            U = (a[0]**(1-self.sigma)-1)/(1-self.sigma) - (a[1]**(1+self.eta)-1)/(1+self.eta) #reward subject to conditions
-        new_productivity = self.rho*s[0]+np.random.normal(0, 0.1) #updates tech.lvl
+            new_capital = (1-self.delta)*s[1]+investment  # updates Capital level
+            U = (a[0]**(1-self.sigma)-1)/(1-self.sigma) - (a[1]**(1+self.eta)-1)/(1+self.eta)  # reward subject to conditions
+        new_productivity = self.rho*s[0] + np.random.normal(0, 0.1)  # updates tech.lvl
         new_state = np.array([new_productivity, new_capital])
-        return new_state, U
+        return new_state, U/100
 
 
 
