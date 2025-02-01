@@ -41,7 +41,7 @@ class ValueNetwork(nn.Module):
         )
 
     def forward(self, x):
-        return self.network(x / 1000)
+        return self.network(x) #/1000
     
 class PolicyNetwork(nn.Module):  
     def __init__(self, state_dim, hidden_dim, action_dim):
@@ -65,8 +65,8 @@ class PolicyNetwork(nn.Module):
 
     def forward(self, state):
         """Forward pass that returns a *distribution* object."""
-        x = self.base(state / 1000)               # direct output of the NN --> "hidden rep. of the state"
-        mean = self.sigmoid(self.mean_head(x))*1         # from hidden rep. we extract the mean of the sigmoid
+        x = self.base(state/3000)               # direct output of the NN --> "hidden rep. of the state"
+        mean = self.sigmoid(self.mean_head(x))         # from hidden rep. we extract the mean of the sigmoid
         std = torch.exp(self.log_std+1e-6)                 # ensures positivity by taking exponential of the log_std
 
         # Create a Normal distribution for each action dimension
@@ -81,7 +81,7 @@ class PolicyNetwork(nn.Module):
         # state is typically 1D or 2D [batch_size, state_dim]. Make sure shapes match.
         dist = self.forward(state.view(1,-1))          # A Normal distribution
         action = dist.sample()              # sample a random action
-        action = torch.clamp(action, min=0)
+        #action = torch.clamp(action, min=0)
         log_prob = dist.log_prob(action).sum(dim=-1)  # sums log probs of each action to get a singlre scalar for the policy training 
         return action, log_prob
 
