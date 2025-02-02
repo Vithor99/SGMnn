@@ -1,11 +1,13 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import pickle
 from simulation import model
 from NN_model import RL_agent
 from tqdm import tqdm 
 
-sim = model(0.5, 0.95, 0.5, 0.3, 0.02, 0.5)
+
+sim = model(0.5, 0.95, 0.5, 0.02)
 agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma = 0.99)
 
 value_losses = []
@@ -21,8 +23,8 @@ for iter in tqdm(range(10000)):
         with torch.no_grad():
             action_tensor, log_prob = agent.policy_net.get_action(st_tensor)
             a = action_tensor.squeeze().numpy()
-            st1, u = sim.step(st, a)
-            agent.replay_buffer.push(st, a, u, st1)
+            st1, u, y = sim.step(st, a)
+            agent.replay_buffer.push(st, a, u, st1, y)
             st = st1
             total_utility += u
     all_utilities.append(total_utility)
@@ -39,7 +41,9 @@ for iter in tqdm(range(10000)):
         plt.plot(all_utilities)
         plt.show()
     
-    
+last_sim=agent.replay_buffer.memory[len(agent.replay_buffer.memory)-t:len(agent.replay_buffer.memory)]
+with open("last_sim.pkl", "wb") as f:
+    pickle.dump(last_sim, f)
 
 print("Training completed")
 

@@ -14,11 +14,11 @@ class Memory(object):
         self.memory = []
         self.position = 0
 
-    def push(self, st, a, u, st1):
+    def push(self, st, a, u, st1, y):
         if len(self.memory) < self.size:
             self.memory.append(None)
 
-        element = {'st': st, 'a': a, 'u': u, 'st1': st1}
+        element = {'st': st, 'a': a, 'u': u, 'st1': st1, 'y':y}
         self.memory[int(self.position)] = element
         self.position = (self.position + 1) % self.size
 
@@ -65,7 +65,7 @@ class PolicyNetwork(nn.Module):
 
     def forward(self, state):
         """Forward pass that returns a *distribution* object."""
-        x = self.base(state/3000)               # direct output of the NN --> "hidden rep. of the state"
+        x = self.base(state)               # direct output of the NN --> "hidden rep. of the state"
         mean = self.sigmoid(self.mean_head(x))         # from hidden rep. we extract the mean of the sigmoid
         std = torch.exp(self.log_std+1e-6)                 # ensures positivity by taking exponential of the log_std
 

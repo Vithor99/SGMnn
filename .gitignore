@@ -1,2 +1,9 @@
+# Ignore all compiled Python files
+*.pyc
+*.pyo
+*.pyd
 
-__pycache__/simulation.cpython-38.pyc
+# Ignore the __pycache__ directory
+__pycache__/
+
+
