@@ -7,14 +7,14 @@ from NN_model import RL_agent
 from tqdm import tqdm 
 
 
-sim = model(0.5, 0.95, 0.5, 0.02)
+sim = model(1, 1.6, 0.025, 0.9, 0.35)
 agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma = 0.99)
 
 value_losses = []
 policy_losses = []
 all_utilities = []
 
-for iter in tqdm(range(10000)):
+for iter in tqdm(range(8000)):
     st = sim.reset()
     total_utility = 0
 

@@ -4,31 +4,32 @@ import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 
 ## Solve steady of the model 
-sigma = 0.5
-alpha = 0.5 
-delta = 0.02
+gamma = 1
+psi = 1.6
+alpha = 0.35
+delta = 0.025
 beta = 0.99
 
 def equations(vars):
     c, n, k = vars
-    ls = (c/(1-n)) - (sigma/(1-sigma))*(1-alpha)*(k/n)**alpha
+    ls = (1-alpha)*(k**alpha)*(n**(-alpha)) - (psi/gamma)*(np.sqrt(c)/np.sqrt(1-n))
     ee = 1 - beta*((1-delta)+alpha*k**(alpha-1)*n**(1-alpha))  
     kt = delta*k - k**alpha * n**(1-alpha) + c 
     return [ls, ee, kt]
 
-initial_guess = [0.1, 0.1, 0.1]  
+initial_guess = [0.5, 0.5, 0.5]  
 solution = fsolve(equations, initial_guess)
 c_ss, n_ss, k_ss = solution
 y_ss = (k_ss)**alpha * (n_ss)**(1-alpha)
-u_ss = (c_ss)**sigma * (n_ss)**(1-sigma)
+u_ss = gamma*np.sqrt(c_ss)+psi*np.sqrt(1-n_ss)
 
 #rescale to match memory and NN magnitudes 
-c_ss = c_ss/100
+c_ss = c_ss/10
 n_ss = n_ss/10
-k_ss = k_ss/1000
-y_ss = y_ss/100
+k_ss = k_ss/100
+y_ss = y_ss/10
 u_ss = u_ss/1000
-print(f"Solution: c = {c_ss}, n = {n_ss}, k = {k_ss}, y={y_ss}, u={u_ss}")
+print(f"Steady state solution: c = {c_ss}, n = {n_ss}, k = {k_ss}, y={y_ss}, u={u_ss}")
 
 
 
@@ -61,8 +62,8 @@ for var in var_list:
 Euler = []
 Lab_supply = []
 for i in range(998):
-    ls = (c[i]/(1-n[i])) - (sigma/(1-sigma))*(1-alpha)*(k[i]/n[i])**alpha
-    ee = c[i]**(sigma-1)*(1-n[i])**(1-sigma) - beta*c[i+1]**(sigma-1)*(1-n[i+1])**(1-sigma)*((1-delta)+alpha*k[i+1]**(alpha-1)*n[i+1]**(1-alpha))     
+    ls = (1-alpha)*(k[i]**alpha)*(n[i]**(-alpha)) - (psi/gamma)*(np.sqrt(c[i])/np.sqrt(1-n[i]))
+    ee = (1/np.sqrt(c[i])) - beta*(1/np.sqrt(c[i+1]))*((1-delta)+alpha*k[i+1]**(alpha-1)*n[i+1]**(1-alpha))     
     Euler.append(ee)
     Lab_supply.append(ls)
 plt.plot(Euler)

@@ -91,7 +91,7 @@ class RL_agent(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma = 0.99 ):
         super(RL_agent, self).__init__()
 
-        self.replay_buffer = Memory(2000)  # per salvarti i dati
+        self.replay_buffer = Memory(2000)  # memeory lenght is two times one iteration of the model
         self.value_net = ValueNetwork(input_dim, hidden_dim, 1)
         self.policy_net = PolicyNetwork(input_dim, hidden_dim, output_dim)
         # Define the Adam optimizer
