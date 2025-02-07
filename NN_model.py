@@ -43,7 +43,8 @@ class ValueNetwork(nn.Module):
     def forward(self, x):
         return self.network(x) #/1000
     
-class PolicyNetwork(nn.Module):  
+class PolicyNetwork(nn.Module):
+
     def __init__(self, state_dim, hidden_dim, action_dim):
         super(PolicyNetwork, self).__init__()
         self.base = nn.Sequential(
@@ -61,7 +62,7 @@ class PolicyNetwork(nn.Module):
         standard deviations of the distributions, initialized at zero: this parameter does not depend on the state! 
         it's adjustable by the NN but will remain the same one for the same action, independently from the state. 
         ''' 
-        self.log_std = nn.Parameter(torch.zeros(action_dim))
+        self.log_std = nn.Parameter(torch.ones(action_dim) * -3)
 
     def forward(self, state):
         """Forward pass that returns a *distribution* object."""
@@ -73,14 +74,15 @@ class PolicyNetwork(nn.Module):
         dist = Normal(mean, std)
         return dist
     
-    def get_action(self, state):
+    def get_action(self, state, test=False):
         """
         Sample an action given 'state'. 
         Returns the action and the log probability of that action under the policy.
         """
         # state is typically 1D or 2D [batch_size, state_dim]. Make sure shapes match.
-        dist = self.forward(state.view(1,-1))          # A Normal distribution
-        action = dist.sample()              # sample a random action
+        dist = self.forward(state.view(1, -1))          # A Normal distribution
+        action = dist.sample() if not test else dist.mean
+        # action = dist.sample()              # sample a random action
         #action = torch.clamp(action, min=0)
         log_prob = dist.log_prob(action).sum(dim=-1)  # sums log probs of each action to get a singlre scalar for the policy training 
         return action, log_prob
@@ -91,14 +93,23 @@ class RL_agent(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma = 0.99 ):
         super(RL_agent, self).__init__()
 
+        self.epsilon = 0.0
+        self.gamma = gamma  # discount factor
+
         self.replay_buffer = Memory(2000)  # memeory lenght is two times one iteration of the model
         self.value_net = ValueNetwork(input_dim, hidden_dim, 1)
         self.policy_net = PolicyNetwork(input_dim, hidden_dim, output_dim)
+
         # Define the Adam optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
-        self.gamma = gamma #discount factor
-        return
+
+
+    def get_action(self, st, test=False):
+        a = self.policy_net.get_action(st, test=test)
+        if np.random.rand() < self.epsilon and not test:
+            a = torch.rand((1, 2))
+        return a
 
     def update(self):
 

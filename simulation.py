@@ -2,15 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #Log Utility Model
-class model: 
+class model:
+
     def __init__(self, gamma, psi, delta, rhoa, alpha):
         self.gamma = gamma #consumption pref
         self.psi = psi
         self.delta = delta #depreciation rate
         self.rhoa = rhoa #AR coff 
         self.alpha = alpha #prduction function
-
-
 
     def reset(self):
         return np.array([0.1, np.random.normal(0.14, 0.01)]) # state at time zero (NN scaled)
@@ -23,13 +22,14 @@ class model:
         #compute Penalty / reward
         y = (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
-        if (1-n)<=0 or c<=0 or n<=0 or 0>=y-c:
-            U =  - (max(0, -c) +  max(0, -n) +  max(0, n-1) + max(0, c-y))
+        if (1-n) <= 0 or c <= 0 or n <= 0 or 0 >= y-c:
+            U = - (max(0, -c) + max(0, -n) + max(0, n-1) + max(0, c-y))
             new_capital = (1-self.delta)*k
         else:
             investment = y - c
             new_capital = (1-self.delta)*k+investment  # updates Capital level
-            U =  self.gamma*np.sqrt(c)+self.psi*np.sqrt(1-n) 
+            U = self.gamma*np.sqrt(c)+self.psi*np.sqrt(1-n)
+
         #new_productivity = (1-self.rho)*0.1 + self.rho*s[0] + np.random.normal(0, 0.01)  # updates tech.lvl
         #rescale magnitudes to feed into NN
         new_state = np.array([0, new_capital/100])

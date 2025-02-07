@@ -38,10 +38,10 @@ print(f"Steady state solution: c = {c_ss}, n = {n_ss}, k = {k_ss}, y={y_ss}, u={
 with open("last_sim.pkl", "rb") as f:
     data = pickle.load(f)
  
-st = [entry ['st'] for entry in data]
-a = [entry ['a'] for entry in data] 
-u = [entry ['u'] for entry in data]
-y = [entry ['y'] for entry in data]
+st = [entry['st'] for _, entry in data.items()]
+a = [entry['a'] for _, entry in data.items()]
+u = [entry['u'] for _, entry in data.items()]
+y = [entry['y'] for _, entry in data.items()]
 k = [pair[1] for pair in st]
 z = [pair[0] for pair in st]
 z = np.exp(z)
@@ -76,10 +76,10 @@ plt.show()
 #sum of discounted utilities 
 V=0
 for t in range(999):
-    V+= beta**t * u[t]
+    V += beta**t * u[t]
 
 V_ss = 0
 for t in range(1000):
-    V_ss += beta**t * (u_ss)
-print(f"Steady state value = {V_ss}; Vaue reached by las simulation = {V}")
+    V_ss += beta**t * u_ss
+print(f"Steady state value = {V_ss}; Value reached by last simulation = {V}")
 print(f"Son of NaN beats the steady state by:{V-V_ss}")
