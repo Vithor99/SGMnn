@@ -5,5 +5,10 @@
 
 # Ignore the __pycache__ directory
 __pycache__/
+logs/
+old_sims
+value_iteration
+
+
 
 

@@ -7,8 +7,7 @@ from NN_model import RL_agent
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter("logs/boh_var_-3_discount")
-
+writer = SummaryWriter("logs/boh_var_-3_shock")
 
 sim = model(1, 1.6, 0.025, 0.9, 0.35)
 agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma=0.99)
@@ -20,7 +19,7 @@ agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma=0.99)
 
 best_utility = -np.inf
 
-for iter in tqdm(range(8000)):
+for iter in tqdm(range(50000)):
 
     ''' Qua mi sto allenando (sto cambiando i pesi del network)'''
 

@@ -1,0 +1,10 @@
+
+tensorboard --logdir ./logs
+
+
+other notes:
+
+- values in NN for both states and acions should have maginitudes ranging around (0.0, 0.2)
+- k - 0.14
+- c - 0.11
+- n - 0.05

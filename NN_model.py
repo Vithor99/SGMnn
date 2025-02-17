@@ -41,7 +41,7 @@ class ValueNetwork(nn.Module):
         )
 
     def forward(self, x):
-        return self.network(x) #/1000
+        return self.network(x) 
     
 class PolicyNetwork(nn.Module):
 
@@ -108,7 +108,7 @@ class RL_agent(nn.Module):
     def get_action(self, st, test=False):
         a = self.policy_net.get_action(st, test=test)
         if np.random.rand() < self.epsilon and not test:
-            a = torch.rand((1, 2))
+            a = torch.rand((1, 2))*0.15
         return a
 
     def update(self):

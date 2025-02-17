@@ -12,15 +12,16 @@ class model:
         self.alpha = alpha #prduction function
 
     def reset(self):
-        return np.array([0.1, np.random.normal(0.14, 0.01)]) # state at time zero (NN scaled)
+        return np.array([0.0, 0.14836]) # state at time zero (NN scaled)
     
     def step(self, s, a):
-        #rescale magnitueds coming from NN 
+        #rescale magnitueds coming from NN
+        z = s[0]*10 
         k = s[1]*100
         c = a[0]*10
         n = a[1]*10
         #compute Penalty / reward
-        y = (k**self.alpha) * (n**(1-self.alpha))
+        y = np.exp(z)*(k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
         if (1-n) <= 0 or c <= 0 or n <= 0 or 0 >= y-c:
             U = - (max(0, -c) + max(0, -n) + max(0, n-1) + max(0, c-y))
@@ -30,9 +31,9 @@ class model:
             new_capital = (1-self.delta)*k+investment  # updates Capital level
             U = self.gamma*np.sqrt(c)+self.psi*np.sqrt(1-n)
 
-        #new_productivity = (1-self.rho)*0.1 + self.rho*s[0] + np.random.normal(0, 0.01)  # updates tech.lvl
+        new_productivity = self.rhoa*z #+ np.random.normal(0, 0.01)  # updates tech.lvl
         #rescale magnitudes to feed into NN
-        new_state = np.array([0, new_capital/100])
+        new_state = np.array([new_productivity/10, new_capital/100])
         return new_state, U/1000, y/10
 
 
