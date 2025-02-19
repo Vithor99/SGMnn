@@ -106,4 +106,4 @@ V_ss = 0
 for t in range(1000):
     V_ss += beta**t * u_ss
 print(f"Steady state value = {V_ss}; Value reached by last simulation = {V}")
-print(f"Son of NaN beats the steady state by:{V-V_ss}")
+print(f"Steady state beats RL by:{V-V_ss}")

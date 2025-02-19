@@ -1,6 +1,6 @@
 
-tensorboard --logdir ./logs
-
+tensorboard --logdir ./logs   #access tensorboard
+rm -r ./logs/"name"                #delete log from tensorboard
 
 other notes:
 

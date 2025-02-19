@@ -62,7 +62,7 @@ class PolicyNetwork(nn.Module):
         standard deviations of the distributions, initialized at zero: this parameter does not depend on the state! 
         it's adjustable by the NN but will remain the same one for the same action, independently from the state. 
         ''' 
-        self.log_std = nn.Parameter(torch.ones(action_dim) * -3)
+        self.log_std = nn.Parameter(torch.ones(action_dim) * -4)
 
     def forward(self, state):
         """Forward pass that returns a *distribution* object."""

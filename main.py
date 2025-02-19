@@ -7,8 +7,9 @@ from NN_model import RL_agent
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter("logs/boh_var_-3_shock")
-
+writer = SummaryWriter("logs/mod1000_var_-4_noshock")
+c_ss = 1.116978
+n_ss = 0.04313
 sim = model(1, 1.6, 0.025, 0.9, 0.35)
 agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma=0.99)
 
@@ -19,7 +20,7 @@ agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma=0.99)
 
 best_utility = -np.inf
 
-for iter in tqdm(range(50000)):
+for iter in tqdm(range(40000)):
 
     ''' Qua mi sto allenando (sto cambiando i pesi del network)'''
 
@@ -45,8 +46,6 @@ for iter in tqdm(range(50000)):
     if v_loss is not None:
         writer.add_scalar("value loss", v_loss, iter)
         writer.add_scalar("policy loss", p_loss, iter)
-        # value_losses.append(v_loss)
-        # policy_losses.append(p_loss)
 
     if iter % 100 == 99:
 
@@ -74,6 +73,8 @@ for iter in tqdm(range(50000)):
 
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:,0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:,1]), iter)
+        writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1,0]-c_ss)+np.abs(all_actions[len(all_actions)-1,0]-c_ss), iter)
+        writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1,1]-n_ss)+np.abs(all_actions[len(all_actions)-1,1]-n_ss), iter)
 
         if best_utility < total_utility:
             best_utility = total_utility
