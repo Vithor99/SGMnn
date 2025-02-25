@@ -7,8 +7,8 @@ from NN_model import RL_agent
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter("logs/mod1000_var_-4_noshock")
-c_ss = 1.116978
+writer = SummaryWriter("logs/mod1000_var_-5(2)_noshock")
+c_ss = 0.1116978
 n_ss = 0.04313
 sim = model(1, 1.6, 0.025, 0.9, 0.35)
 agent = RL_agent(input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma=0.99)
