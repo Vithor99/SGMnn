@@ -14,8 +14,8 @@ class model:
 
         self.device = device
 
+
     def reset(self):
-        # return torch.tensor([0.0, 0.14836]).float().to(self.device) # state at time zero (NN scaled)
         return torch.tensor([0.0, 0.14836]).float().to(self.device)  # state at time zero (NN scaled)
     
     def step(self, s, a):
@@ -39,7 +39,9 @@ class model:
 
         new_productivity = self.rhoa*z #+ np.random.normal(0, 0.01)  # updates tech.lvl
         #rescale magnitudes to feed into NN
-        new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
+        # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
+        new_state = torch.stack([new_productivity / 10, new_capital / 100])
+
 
         return new_state, U/1000, y/10
 

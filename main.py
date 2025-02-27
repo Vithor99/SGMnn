@@ -31,7 +31,8 @@ torch.manual_seed(seed)
 torch.random.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 name_exp = ''
 for k, v in args.__dict__.items():
@@ -121,7 +122,7 @@ for iter in tqdm(range(EPOCHS)):
             # st_tensor = torch.FloatTensor(st)
             with torch.no_grad():
                 action_tensor, log_prob = agent.policy_net.get_action(st, test=True)
-                a = action_tensor.squeeze().numpy()
+                a = action_tensor.squeeze() #.numpy()
                 st1, u, y = sim.step(st, a)
 
                 last_sim[t] = {'st': st.detach().cpu().numpy(),

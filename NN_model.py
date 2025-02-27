@@ -64,14 +64,20 @@ class PolicyNetwork(nn.Module):
         else:
             std = torch.exp(self.log_std*self.var_scale+1e-6)
 
-        # TODO: solve inplace operation
-        for i in self.action_bounds['order']:
-            a_min = self.action_bounds['min'][i]()
-            a_max = self.action_bounds['max'][i](state[:, 0], state[:, 1], self.alpha, mean[:, 1])
-            mean[:, i] = mean[:, i] * (a_max - a_min)
-            mean[:, i] = mean[:, i] + a_min
+        # # TODO: solve inplace operation
+        # for i in self.action_bounds['order']:
+        #     a_min = self.action_bounds['min'][i]()
+        #     a_max = self.action_bounds['max'][i](state[:, 0], state[:, 1], self.alpha, mean[:, 1])
+        #     mean[:, i] = mean[:, i] * (a_max - a_min)
+        #     mean[:, i] = mean[:, i] + a_min
 
-        dist = Normal(mean, std)
+        bound_mean_1 = mean[:, 1]
+        a_min = self.action_bounds['min'][0]()
+        a_max = self.action_bounds['max'][0](state[:, 0], state[:, 1], self.alpha, mean[:, 1])#.detach().cpu().numpy()
+        bound_mean_0 = mean[:, 0] * (a_max - a_min) + a_min
+        bound_mean = torch.stack([bound_mean_0, bound_mean_1], -1)
+
+        dist = Normal(bound_mean, std)
         return dist
     
     def get_action(self, state, test=False):
