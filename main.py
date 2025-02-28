@@ -19,7 +19,7 @@ parser.add_argument('--policy_var', default=-4.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=0.99, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
-parser.add_argument('--batch_size', default=100, type=int)
+parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
 ''' SIMULATOR '''
 # TODO:
@@ -38,7 +38,7 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp)
+writer = SummaryWriter("logs/"+name_exp + "")
 
 ''' Define Simulator'''
 state_dim = 2
@@ -77,7 +77,7 @@ agent = RL_agent(input_dim=state_dim,
 
 T = 1000
 EPOCHS = 40000
-frq_train = 1
+frq_train = 3
 frq_test = 100
 best_utility = -np.inf
 
@@ -91,11 +91,14 @@ for iter in tqdm(range(EPOCHS)):
         with torch.no_grad():
             action_tensor, log_prob = agent.policy_net.get_action(st)
             a = action_tensor.squeeze() #.numpy()
-            st1, u, y = sim.step(st, a)
+            st1, u, y, done = sim.step(st, a)
             # agent.replay_buffer.push(st, a, u, st1, y)
-            agent.batchdata.push(st, a, log_prob, u, st1, y)
+            agent.batchdata.push(st, a, log_prob, u, st1, y, float(not done))
             st = st1
             total_utility += (agent.gamma ** t) * u
+            if done:
+                st = sim.reset()
+                # total_utility = 0
 
     writer.add_scalar("train utility", total_utility.detach().cpu().item(), iter)
 
@@ -123,7 +126,7 @@ for iter in tqdm(range(EPOCHS)):
             with torch.no_grad():
                 action_tensor, log_prob = agent.policy_net.get_action(st, test=True)
                 a = action_tensor.squeeze() #.numpy()
-                st1, u, y = sim.step(st, a)
+                st1, u, y, done = sim.step(st, a)
 
                 last_sim[t] = {'st': st.detach().cpu().numpy(),
                                'a': a.detach().cpu().numpy(),
@@ -134,6 +137,9 @@ for iter in tqdm(range(EPOCHS)):
 
                 st = st1
                 total_utility += (agent.gamma ** t) * u
+
+                if done:
+                    break
 
         writer.add_scalar("test utility", total_utility, iter)
 

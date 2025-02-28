@@ -38,14 +38,16 @@ class BatchData:
         self.u = []
         self.st1 = []
         self.y = []
+        self.terminal = []
 
-    def push(self, st, a, logprob, u, st1, y):
+    def push(self, st, a, logprob, u, st1, y, terminal):
         self.st.append(st)
         self.a.append(a)
         self.logprobs.append(logprob)
         self.u.append(u)
         self.st1.append(st1)
         self.y.append(y)
+        self.terminal.append(terminal)
 
     def clear(self):
         self.st.clear()
@@ -54,3 +56,4 @@ class BatchData:
         self.u.clear()
         self.st1.clear()
         self.y.clear()
+        self.terminal.clear()

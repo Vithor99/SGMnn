@@ -30,6 +30,7 @@ class model:
         y = torch.exp(z)*(k**self.alpha) * (n**(1-self.alpha))
         y = torch.nan_to_num(y, nan=0.0)
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
+            # return s, torch.tensor(-0.001).float().to(self.device), y/10, True
             U = - (torch.clamp(-c, min=0) + torch.clamp(-n, min=0) + torch.clamp(n-1, min=0) + torch.clamp(c - y, min=0))
             new_capital = (1-self.delta)*k
         else:
@@ -43,7 +44,7 @@ class model:
         new_state = torch.stack([new_productivity / 10, new_capital / 100])
 
 
-        return new_state, U/1000, y/10
+        return new_state, U/1000, y/10, False
 
 
 
