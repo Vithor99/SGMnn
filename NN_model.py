@@ -4,106 +4,123 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Normal
+import torch.distributions as D
+import torch.distributions.transforms as T
 import random
-
-
-class Memory(object):
-    
-    def __init__(self, size):
-        self.size = size
-        self.memory = []
-        self.position = 0
-
-    def push(self, st, a, u, st1, y):
-        if len(self.memory) < self.size:
-            self.memory.append(None)
-
-        element = {'st': st, 'a': a, 'u': u, 'st1': st1, 'y':y}
-        self.memory[int(self.position)] = element
-        self.position = (self.position + 1) % self.size
-
-    def sample(self , batch_size):
-        return random.sample(self.memory, batch_size)
-
-    def __len__(self):
-        return len(self.memory)
+from utils import Memory, BatchData
 
 
 class ValueNetwork(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim, architecture_params, output_dim):
         super(ValueNetwork, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
-        )
+
+        layers = [nn.Linear(input_dim, architecture_params['n_neurons']), nn.ReLU()]
+        for _ in range(architecture_params['n_layers']):
+            layers += [nn.Linear(architecture_params['n_neurons'], architecture_params['n_neurons']),
+                       nn.ReLU()]
+        layers += [nn.Linear(architecture_params['n_neurons'], output_dim)]
+        self.network = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.network(x) 
-    
+
+
 class PolicyNetwork(nn.Module):
 
-    def __init__(self, state_dim, hidden_dim, action_dim):
+    def __init__(self, state_dim, architecture_params, action_dim, alpha=0, learn_std=True):
         super(PolicyNetwork, self).__init__()
-        self.base = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-        )
 
-        # extracts mean of the distributions form the final layer of the NN
-        self.mean_head = nn.Linear(hidden_dim, action_dim)
+        self.var_scale = architecture_params['policy_var']
+        self.learn_std = learn_std
+        self.action_bounds = architecture_params['action_bounds']
+        self.alpha = alpha
+
+        layers = [nn.Linear(state_dim, architecture_params['n_neurons']), nn.ReLU()]
+        for _ in range(architecture_params['n_layers']):
+            layers += [nn.Linear(architecture_params['n_neurons'], architecture_params['n_neurons']),
+                       nn.ReLU()]
+        layers += [nn.Linear(architecture_params['n_neurons'], architecture_params['n_neurons']),
+                   nn.ReLU()]
+        self.base = nn.Sequential(*layers)
+
+        self.mean_head = nn.Sequential(
+            nn.Linear(architecture_params['n_neurons'], architecture_params['n_neurons']),
+            nn.ReLU(),
+            nn.Linear(architecture_params['n_neurons'], action_dim),
+        )
+        if learn_std:
+            self.std_head = nn.Sequential(
+                nn.Linear(architecture_params['n_neurons'], architecture_params['n_neurons']),
+                nn.ReLU(),
+                nn.Linear(architecture_params['n_neurons'], action_dim),
+            )
+        else:
+            self.log_std = nn.Parameter(torch.ones(action_dim)*self.var_scale)
         self.sigmoid = nn.Sigmoid()
 
-        '''
-        standard deviations of the distributions, initialized at zero: this parameter does not depend on the state! 
-        it's adjustable by the NN but will remain the same one for the same action, independently from the state. 
-        ''' 
-        self.log_std = nn.Parameter(torch.ones(action_dim) * -3.5)
+        # self.scale_mean = torch.tensor([[0.1, 0.2]]).float()
 
     def forward(self, state):
-        """Forward pass that returns a *distribution* object."""
-        x = self.base(state)               # direct output of the NN --> "hidden rep. of the state"
-        mean = self.sigmoid(self.mean_head(x))         # from hidden rep. we extract the mean of the sigmoid
-        std = torch.exp(self.log_std+1e-6)                 # ensures positivity by taking exponential of the log_std
 
-        # Create a Normal distribution for each action dimension
-        dist = Normal(mean, std)
+        x = self.base(state)
+        mean = self.sigmoid(self.mean_head(x))
+        if self.learn_std:
+            std = torch.exp(self.std_head(x)+1e-6)
+        else:
+            std = torch.exp(self.log_std+1e-6)
+
+        ''' questo e' con i bound '''
+        lower_bound = torch.zeros_like(mean)
+        upper_bound = torch.ones_like(mean)
+        upper_bound[:, 1] *= 0.1
+        upper_bound[:, 0] *= self.action_bounds['max'][0](state[:, 0], state[:, 1], self.alpha, mean[0, 1] * 0.1)
+
+        base_dist = D.Independent(D.Normal(mean, std[1]), 1)
+        sigmoid_transform = T.SigmoidTransform()
+        affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+        transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+        dist = D.TransformedDistribution(base_dist, transform)
+
+        ''' questo e' senza '''
+        # dist = Normal(mean, std)
+
         return dist
     
     def get_action(self, state, test=False):
-        """
-        Sample an action given 'state'. 
-        Returns the action and the log probability of that action under the policy.
-        """
-        # state is typically 1D or 2D [batch_size, state_dim]. Make sure shapes match.
-        dist = self.forward(state.view(1, -1))          # A Normal distribution
-        action = dist.sample() if not test else dist.mean
-        # action = dist.sample()              # sample a random action
-        #action = torch.clamp(action, min=0)
-        log_prob = dist.log_prob(action).sum(dim=-1)  # sums log probs of each action to get a singlre scalar for the policy training 
+        dist = self.forward(state.view(1, -1))
+        action = dist.sample() if not test else dist.sample([1000]).mean(0) #dist.mean
+
+        # a1 = torch.clamp(action[:, 1], 0, 0.1)
+        # a0 = torch.clamp(action[:, 0], 0, self.action_bounds['max'][0](state[0], state[1], self.alpha, a1).detach().cpu().item())
+        # action = torch.stack([a0, a1], -1)
+
+        # for i in self.action_bounds['order']:
+        #     a_min = self.action_bounds['min'][i]()
+        #     a_max = self.action_bounds['max'][i](state[0], state[1], self.alpha, action[0, 1])
+        #     action[:, i] = torch.clamp(action[:, i], min=a_min, max=a_max)
+
+        log_prob = dist.log_prob(action).sum(dim=-1)
         return action, log_prob
 
 
 class RL_agent(nn.Module):
 
-    def __init__(self, input_dim=2, hidden_dim=128, output_dim=2, lr=1e-3, gamma = 0.99 ):
+    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True):
         super(RL_agent, self).__init__()
 
-        self.epsilon = 0.0
-        self.gamma = gamma  # discount factor
+        self.epsilon = epsilon
+        self.gamma = gamma
+        self.batch_size = batch_size
 
-        self.replay_buffer = Memory(2000)  # memeory lenght is two times one iteration of the model
-        self.value_net = ValueNetwork(input_dim, hidden_dim, 1)
-        self.policy_net = PolicyNetwork(input_dim, hidden_dim, output_dim)
+        self.batchdata = BatchData()
 
-        # Define the Adam optimizer
-        self.optimizer = optim.Adam(self.parameters(), lr=lr)
+        # self.replay_buffer = Memory(2000)
+        self.value_net = ValueNetwork(input_dim, architecture_params, 1)
+        self.policy_net = PolicyNetwork(input_dim, architecture_params, output_dim, alpha=alpha, learn_std=learn_std)
+
+        self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
+        self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
-
 
     def get_action(self, st, test=False):
         a = self.policy_net.get_action(st, test=test)
@@ -113,41 +130,50 @@ class RL_agent(nn.Module):
 
     def update(self):
 
-        if len(self.replay_buffer) < 1000: #training starts after the first model simulation
-            return None, None 
+        # if len(self.replay_buffer) < 1000: #training starts after the first model simulation
+        #     return None, None
 
-        # sampling from bacth and converting to tensors
-        batch = self.replay_buffer.sample(100)
-        states = torch.tensor([item['st'] for item in batch], dtype=torch.float32)
-        next_states = torch.tensor([item['st1'] for item in batch], dtype=torch.float32)
-        rewards = torch.tensor([item['u'] for item in batch], dtype=torch.float32)
-        actions = torch.tensor([item['a'] for item in batch], dtype=torch.float32)
+        states = torch.cat([x.view(1, -1) for x in self.batchdata.st], 0)
+        next_states = torch.cat([x.view(1, -1) for x in self.batchdata.st1], 0)
+        rewards = torch.cat([x.view(1) for x in self.batchdata.u], 0)
+        actions = torch.cat([x.view(1, -1) for x in self.batchdata.a], 0)
+        terminal = torch.tensor([x for x in self.batchdata.terminal])
+
+        idx = np.random.choice(np.arange(states.shape[0]), self.batch_size)
+        states = states[idx].detach()
+        next_states = next_states[idx].detach()
+        rewards = rewards[idx].detach()
+        actions = actions[idx].detach()
+        terminal = terminal[idx]
 
         # Compute the target values
         with torch.no_grad():
             next_state_values = self.value_net(next_states).squeeze()
-            target_values = rewards + self.gamma * next_state_values
+            target_values = rewards + terminal * self.gamma * next_state_values
 
         # Compute the predicted values
         predicted_values = self.value_net(states).squeeze()
         At = (target_values - predicted_values).detach()
+        # At /= 1e-3 #At.mean()
 
         # Compute the loss
-        loss_V = self.loss_fn(predicted_values, target_values) 
-        
+        loss_V = self.loss_fn(predicted_values, target_values)
         
         current_dist = self.policy_net(states)
-        new_logprobs = current_dist.log_prob(actions).sum(dim=-1)
+        new_logprobs = current_dist.log_prob(actions)
+        new_logprobs = new_logprobs if new_logprobs.dim() == 1 else new_logprobs.sum(dim=-1)
 
         policy_loss = -(new_logprobs * At).mean()
-        loss = loss_V + policy_loss
 
-        self.optimizer.zero_grad() #clearing old gradients 
-        loss.backward() #computing new gradients --> VERY IMPORTANT  
-        self.optimizer.step() #computing new paramenters based on the gradients 
+        self.optimizer_v.zero_grad()
+        loss_V.backward()
+        self.optimizer_v.step()
+
+        self.optimizer_pi.zero_grad()
+        policy_loss.backward()
+        self.optimizer_pi.step()
 
         return loss_V.detach().item(), policy_loss.detach().item()
-
 
 
 
