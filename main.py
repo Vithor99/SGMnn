@@ -7,7 +7,7 @@ from NN_model import RL_agent
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter("logs/mod1000_var_-5(2)_noshock")
+writer = SummaryWriter("logs/mod1000_var_-3.5_noshock")
 c_ss = 0.1116978
 n_ss = 0.04313
 sim = model(1, 1.6, 0.025, 0.9, 0.35)
@@ -92,8 +92,6 @@ for iter in tqdm(range(40000)):
         # plt.show()
     
 
-
-print("Training completed")
 
 # plt.plot(value_losses, label='Value Loss')
 # plt.plot(policy_losses, label='Policy Loss')
