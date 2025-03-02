@@ -5,18 +5,20 @@ import torch
 #Log Utility Model
 class model:
 
-    def __init__(self, gamma, psi, delta, rhoa, alpha, device=None):
+    def __init__(self, k0, gamma, psi, delta, rhoa, alpha, device=None):
         self.gamma = gamma #consumption pref
         self.psi = psi
         self.delta = delta #depreciation rate
         self.rhoa = rhoa #AR coff 
         self.alpha = alpha #prduction function
 
+        self.k0 = k0
+
         self.device = device
 
 
     def reset(self):
-        return torch.tensor([0.0, 0.14836]).float().to(self.device)  # state at time zero (NN scaled)
+        return torch.tensor([0.0, self.k0]).float().to(self.device)  # state at time zero (NN scaled)
     
     def step(self, s, a):
 
@@ -36,7 +38,9 @@ class model:
         else:
             investment = y - c
             new_capital = (1-self.delta)*k+investment  # updates Capital level
-            U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
+            
+            #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
+            U = self.gamma*torch.log(c)+self.psi*torch.log(1-n)
 
         new_productivity = self.rhoa*z #+ np.random.normal(0, 0.01)  # updates tech.lvl
         #rescale magnitudes to feed into NN

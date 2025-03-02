@@ -7,8 +7,9 @@ from NN_model import RL_agent
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
+from steady import steady
 
-
+ss = steady()
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
@@ -17,7 +18,7 @@ parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
 parser.add_argument('--policy_var', default=-4.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
-parser.add_argument('--gamma', default=0.99, type=float)
+parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
@@ -38,15 +39,14 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp + "")
+writer = SummaryWriter("logs/"+name_exp + "logu")
 
 ''' Define Simulator'''
-state_dim = 2
-action_dim = 2
-c_ss = 0.1116978
-n_ss = 0.04313
-alpha = 0.35
-sim = model(1, 1.6, 0.025, 0.9, alpha, device=device)
+c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
+state_dim = ss.states
+action_dim = ss.actions
+sim = model(k_ss, ss.gamma, ss.psi, ss.delta, ss.rhoa, ss.alpha, device=device)
+alpha = ss.alpha
 
 action_bounds = {
     'order': [1, 0],
@@ -100,7 +100,7 @@ for iter in tqdm(range(EPOCHS)):
                 st = sim.reset()
                 # total_utility = 0
 
-    writer.add_scalar("train utility", total_utility.detach().cpu().item(), iter)
+    writer.add_scalar("train utility", np.abs(total_utility.detach().cpu().item()-v_ss), iter)
 
     # qua alleniamo NN
     if iter % frq_train == 0:
@@ -141,7 +141,7 @@ for iter in tqdm(range(EPOCHS)):
                 if done:
                     break
 
-        writer.add_scalar("test utility", total_utility, iter)
+        writer.add_scalar("test utility", np.abs(total_utility-v_ss), iter)
 
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:,0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:,1]), iter)

@@ -13,11 +13,10 @@ with open("last_sim.pkl", "rb") as f:
  
 st = [entry['st'] for _, entry in data.items()]
 a = [entry['a'] for _, entry in data.items()]
-u = [entry['u']*1000 for _, entry in data.items()]
+u = [entry['u']*1000 for _, entry in data.items()] 
 y = [entry['y']*10 for _, entry in data.items()]
 k = [pair[1]*100 for pair in st]
 z = [pair[0] for pair in st]
-z = np.exp(z)
 c = [pair[0]*10 for pair in a]
 n = [pair[1]*10 for pair in a]
 
@@ -25,7 +24,7 @@ n = [pair[1]*10 for pair in a]
 Euler = []
 Lab_supply = []
 for i in range(998):
-    ls, ee = ss.foc(c[i], c[i+1], n[i], n[i+1], k[i], k[i+1])
+    ls, ee = ss.foc_log(c[i], c[i+1], n[i], n[i+1], k[i], k[i+1])
     Euler.append(ee)
     Lab_supply.append(ls)
 
@@ -36,13 +35,13 @@ for t in range(999):
 
 #plotting variable histories 
 plt.plot(k)
-plt.ylim(13, 15.5)
+plt.ylim(10, 15)
 plt.axhline(k_ss, color="green")
 plt.title("k")
 plt.show()
 
 plt.plot(c)
-plt.ylim(1, 1.3)
+plt.ylim(0.7, 1.1)
 plt.axhline(c_ss, color="green")
 plt.title("c")
 plt.show()
@@ -60,7 +59,7 @@ plt.title("y")
 plt.show()
 
 plt.plot(u)
-plt.ylim(2, 2.5)
+plt.ylim(-1.3, 0)
 plt.axhline(u_ss, color="green")
 plt.title("u")
 plt.show()
