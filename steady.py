@@ -25,7 +25,7 @@ class steady:
         return [ls, ee, kt]
     
     def ss(self):
-        initial_guess = [0.5, 0.5, 0.5]  
+        initial_guess = [0.5, 0.5, 0.5]
         solution = fsolve(self.equations, initial_guess)
         c_ss, n_ss, k_ss = solution
         y_ss = (k_ss)**self.alpha * (n_ss)**(1-self.alpha)

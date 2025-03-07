@@ -2,28 +2,37 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import pickle
-from simulation import model
-from NN_model import RL_agent
+from simulation import Model
+from NN_model import ActorCritic
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
 from steady import steady
 
+import gymnasium as gym
+from gymnasium.envs.registration import register
+from gymnasium.vector import SyncVectorEnv
+
+
 ss = steady()
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-4.0, type=float)
+parser.add_argument('--policy_var', default=-2.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
+parser.add_argument('--use_hard_bounds', default=1, type=int)
 ''' SIMULATOR '''
-# TODO:
+parser.add_argument('--n_workers', default=10, type=int)
+
 args = parser.parse_args()
 
 seed = args.seed
@@ -45,7 +54,6 @@ writer = SummaryWriter("logs/"+name_exp + "logu")
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
 state_dim = ss.states
 action_dim = ss.actions
-sim = model(k_ss, ss.gamma, ss.psi, ss.delta, ss.rhoa, ss.alpha, device=device)
 alpha = ss.alpha
 
 action_bounds = {
@@ -62,18 +70,37 @@ action_bounds = {
 architecture_params = {'n_layers': args.n_layers,
                        'n_neurons': args.n_neurons,
                        'policy_var': args.policy_var,
-                       'action_bounds': action_bounds
+                       'action_bounds': action_bounds,
+                       'use_hard_bounds': args.use_hard_bounds
                        }
 
-agent = RL_agent(input_dim=state_dim,
-                 architecture_params=architecture_params,
-                 output_dim=action_dim,
-                 lr=args.lr,
-                 gamma=args.gamma,
-                 epsilon=args.epsilon_greedy,
-                 batch_size=args.batch_size,
-                 alpha=alpha,
-                 learn_std=args.learn_std==1).to(device)
+agent = ActorCritic(input_dim=state_dim,
+                    architecture_params=architecture_params,
+                    output_dim=action_dim,
+                    lr=args.lr,
+                    gamma=args.gamma,
+                    epsilon=args.epsilon_greedy,
+                    batch_size=args.batch_size,
+                    alpha=alpha,
+                    learn_std=args.learn_std==1,
+                    device=device).to(device)
+
+
+register(
+    id="model",
+    entry_point="simulation:Model",
+    kwargs={'k': k_ss, 'gamma': ss.gamma, 'psi': ss.psi, 'delta': ss.delta, 'rhoa': ss.rhoa, 'alpha': ss.alpha, 'T': 1000},
+)
+
+def make_env():
+    return gym.make("model")
+
+test_sim = gym.make("model")
+
+sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
+# sims = gym.make_vec("model", num_envs=args.n_workers, vectorization_mode="async")
+# sims = gym.make_vec("model", num_envs=args.n_workers, vectorization_mode="sync")
+
 
 T = 1000
 EPOCHS = 40000
@@ -83,27 +110,29 @@ best_utility = -np.inf
 
 for iter in tqdm(range(EPOCHS)):
 
-    st = sim.reset()
+    st, _ = sims.reset()
     total_utility = 0
 
-    for t in range(T):
-        # st_tensor = torch.FloatTensor(st)
+    for t in range(100):
+        st_tensor = torch.from_numpy(st).float().to(device)
         with torch.no_grad():
-            action_tensor, log_prob = agent.policy_net.get_action(st)
-            a = action_tensor.squeeze() #.numpy()
-            st1, u, y, done = sim.step(st, a)
-            # agent.replay_buffer.push(st, a, u, st1, y)
-            agent.batchdata.push(st, a, log_prob, u, st1, y, float(not done))
-            st = st1
-            total_utility += (agent.gamma ** t) * u
-            if done:
-                st = sim.reset()
-                # total_utility = 0
+            action_tensor, log_prob = agent.get_action(st_tensor)
+            a = action_tensor.numpy()
+            st1, u, done, _, y = sims.step(a)
 
-    writer.add_scalar("train utility", np.abs(total_utility.detach().cpu().item()-v_ss), iter)
+            y = y['y']
+            for i in range(args.n_workers):
+                # agent.replay_buffer.push(st, a, u, st1, y)
+                agent.batchdata.push(st[i], a[i], log_prob[i].detach().cpu().numpy(), u[i], st1[i], y[i], float(not done[i]))
+
+            st = st1
+            total_utility += np.mean((agent.gamma ** t) * u)
+
+
+    writer.add_scalar("train utility", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
 
     # qua alleniamo NN
-    if iter % frq_train == 0:
+    if iter % frq_train == (frq_train-1):
         v_loss, p_loss = agent.update()
         agent.batchdata.clear()
 
@@ -119,21 +148,22 @@ for iter in tqdm(range(EPOCHS)):
         last_sim = {}
         all_actions = np.zeros((T, 2))
 
-        st = sim.reset()
+        st, _ = test_sim.reset()
         total_utility = 0
         for t in range(T):
-            # st_tensor = torch.FloatTensor(st)
+            st_tensor = torch.from_numpy(st).float().to(device)
             with torch.no_grad():
-                action_tensor, log_prob = agent.policy_net.get_action(st, test=True)
-                a = action_tensor.squeeze() #.numpy()
-                st1, u, y, done = sim.step(st, a)
+                action_tensor, log_prob = agent.get_action(st_tensor, test=True)
+                a = action_tensor.squeeze().numpy()
+                st1, u, done, _, y = test_sim.step(a)
+                y = y['y']
 
-                last_sim[t] = {'st': st.detach().cpu().numpy(),
-                               'a': a.detach().cpu().numpy(),
-                               'u': u.detach().cpu().numpy(),
-                               'st1': st1.detach().cpu().numpy(),
-                               'y': y.detach().cpu().numpy()}
-                all_actions[t, :] = a.detach().cpu().numpy()
+                last_sim[t] = {'st': st,
+                               'a': a,
+                               'u': u,
+                               'st1': st1,
+                               'y': y}
+                all_actions[t, :] = a
 
                 st = st1
                 total_utility += (agent.gamma ** t) * u
@@ -141,12 +171,12 @@ for iter in tqdm(range(EPOCHS)):
                 if done:
                     break
 
-        writer.add_scalar("test utility", np.abs(total_utility-v_ss), iter)
+        writer.add_scalar("test utility", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
 
-        writer.add_scalar("var action 0 per sim", np.var(all_actions[:,0]), iter)
-        writer.add_scalar("var action 1 per sim", np.var(all_actions[:,1]), iter)
-        writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1,0]-c_ss)+np.abs(all_actions[len(all_actions)-1,0]-c_ss), iter)
-        writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1,1]-n_ss)+np.abs(all_actions[len(all_actions)-1,1]-n_ss), iter)
+        writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
+        writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
+        writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1, 0]-c_ss)+np.abs(all_actions[len(all_actions)-1, 0]-c_ss), iter)
+        writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1, 1]-n_ss)+np.abs(all_actions[len(all_actions)-1, 1]-n_ss), iter)
 
         if best_utility < total_utility:
             best_utility = total_utility

@@ -1,54 +1,80 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
+import gymnasium as gym
+from gymnasium import spaces
 
-#Log Utility Model
-class model:
 
-    def __init__(self, k0, gamma, psi, delta, rhoa, alpha, device=None):
+class Model(gym.Env):
+
+    def __init__(self, k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0):
+        super().__init__()
+
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
+        )
+        self.action_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
+        )
+        self.state = np.zeros(2)
+        self.time = 0
+
+        self.T = T
         self.gamma = gamma #consumption pref
         self.psi = psi
         self.delta = delta #depreciation rate
         self.rhoa = rhoa #AR coff 
         self.alpha = alpha #prduction function
+        self.k0 = k
 
-        self.k0 = k0
-
-        self.device = device
-
-
-    def reset(self):
-        return torch.tensor([0.0, self.k0]).float().to(self.device)  # state at time zero (NN scaled)
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.time = 0
+        self.state[0] = 0
+        self.state[1] = self.k0
+        obs = np.array(self.state, dtype=np.float32)
+        return obs, {'y': 0}
     
-    def step(self, s, a):
+    def step(self, action):
 
         #rescale magnitueds coming from NN
-        z = s[0]*10 
-        k = s[1]*100
-        c = a[0]*10
-        n = a[1]*10
+        z = self.state[0]*10
+        k = self.state[1]*100
+        c = action[0]*10
+        n = action[1]*10
 
         #compute Penalty / reward
-        y = torch.exp(z)*(k**self.alpha) * (n**(1-self.alpha))
-        y = torch.nan_to_num(y, nan=0.0)
+        y = np.exp(z)*(k**self.alpha) * (n**(1-self.alpha))
+        y = np.nan_to_num(y, nan=0.0)
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             # return s, torch.tensor(-0.001).float().to(self.device), y/10, True
-            U = - (torch.clamp(-c, min=0) + torch.clamp(-n, min=0) + torch.clamp(n-1, min=0) + torch.clamp(c - y, min=0))
+            U = - (
+                    np.maximum(-c, 0)
+                    + np.maximum(-n, 0)
+                    + np.maximum(n - 1, 0)
+                    + np.maximum(c - y, 0)
+            )
             new_capital = (1-self.delta)*k
         else:
             investment = y - c
             new_capital = (1-self.delta)*k+investment  # updates Capital level
             
             #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
-            U = self.gamma*torch.log(c)+self.psi*torch.log(1-n)
+            U = self.gamma*np.log(c)+self.psi*np.log(1-n)
 
         new_productivity = self.rhoa*z #+ np.random.normal(0, 0.01)  # updates tech.lvl
         #rescale magnitudes to feed into NN
         # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
-        new_state = torch.stack([new_productivity / 10, new_capital / 100])
 
+        self.state = np.stack([new_productivity / 10, new_capital / 100])
+        new_state = np.array(self.state, dtype=np.float32)
 
-        return new_state, U/1000, y/10, False
+        self.time += 1
+
+        done = False
+        if self.time >= self.T:
+            done = True
+
+        return new_state, U/1000, done, False, {'y': y/10}
 
 
 
