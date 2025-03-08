@@ -37,10 +37,10 @@ class Model(gym.Env):
     def step(self, action):
 
         #rescale magnitueds coming from NN
-        z = self.state[0]*10
-        k = self.state[1]*100
-        c = action[0]*10
-        n = action[1]*10
+        z = self.state[0]
+        k = self.state[1]
+        c = action[0]
+        n = action[1]
 
         #compute Penalty / reward
         y = np.exp(z)*(k**self.alpha) * (n**(1-self.alpha))
@@ -65,7 +65,7 @@ class Model(gym.Env):
         #rescale magnitudes to feed into NN
         # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
 
-        self.state = np.stack([new_productivity / 10, new_capital / 100])
+        self.state = np.stack([new_productivity, new_capital])
         new_state = np.array(self.state, dtype=np.float32)
 
         self.time += 1
@@ -74,7 +74,7 @@ class Model(gym.Env):
         if self.time >= self.T:
             done = True
 
-        return new_state, U/1000, done, False, {'y': y/10}
+        return new_state, U, done, False, {'y': y}
 
 
 

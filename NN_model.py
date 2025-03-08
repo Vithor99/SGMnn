@@ -67,21 +67,23 @@ class ActorCritic(nn.Module):
         # Compute the predicted values
         predicted_values = self.value_net(states).squeeze()
         At = (target_values - predicted_values).detach()
-        # At /= 1e-3 #At.mean()
+        At_norm = At #(At - At.mean()) / (At.std() + 1e-7)
 
         # Compute the loss
         loss_V = self.loss_fn(predicted_values, target_values)
 
         new_logprobs = self.policy_net.get_log_prob(states, actions)
 
-        policy_loss = -(new_logprobs * At).mean()
+        policy_loss = -(new_logprobs * At_norm).mean()
 
         self.optimizer_v.zero_grad()
         loss_V.backward()
+        # torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 0.5)
         self.optimizer_v.step()
 
         self.optimizer_pi.zero_grad()
         policy_loss.backward()
+        # torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
         self.optimizer_pi.step()
 
         return loss_V.detach().item(), policy_loss.detach().item()

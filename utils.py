@@ -7,6 +7,10 @@ from torch.distributions import Normal
 import random
 
 
+def state_preprocessor(s):
+    return s/100
+
+
 class Memory(object):
 
     def __init__(self, size):

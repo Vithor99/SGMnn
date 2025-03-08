@@ -31,7 +31,7 @@ parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
 parser.add_argument('--use_hard_bounds', default=1, type=int)
 ''' SIMULATOR '''
-parser.add_argument('--n_workers', default=10, type=int)
+parser.add_argument('--n_workers', default=4, type=int)
 
 args = parser.parse_args()
 
@@ -48,7 +48,7 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp + "logu")
+writer = SummaryWriter("logs/"+name_exp + "long_no_adv_norm_2_no_clip")
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
@@ -62,7 +62,7 @@ action_bounds = {
     'min': [lambda: 0,
             lambda: 0],
     'max': [lambda s0, s1, alpha, a1: torch.exp(s0) * (s1**alpha * a1**(1-alpha)),
-            lambda s0, s1, alpha, a1: 0.1]
+            lambda s0, s1, alpha, a1: 1.0]
     }
 
 
@@ -96,6 +96,8 @@ def make_env():
     return gym.make("model")
 
 test_sim = gym.make("model")
+
+random_util = ss.get_random_policy_utility(test_sim)
 
 sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 # sims = gym.make_vec("model", num_envs=args.n_workers, vectorization_mode="async")
@@ -171,12 +173,13 @@ for iter in tqdm(range(EPOCHS)):
                 if done:
                     break
 
-        writer.add_scalar("test utility", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
+        writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
+        writer.add_scalar("improvement over random policy", (total_utility-random_util)/(v_ss-random_util), iter)
 
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
-        writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1, 0]-c_ss)+np.abs(all_actions[len(all_actions)-1, 0]-c_ss), iter)
-        writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1, 1]-n_ss)+np.abs(all_actions[len(all_actions)-1, 1]-n_ss), iter)
+        writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1, 0]-c_ss)+np.abs(all_actions[-1, 0]-c_ss), iter)
+        writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1, 1]-n_ss)+np.abs(all_actions[-1, 1]-n_ss), iter)
 
         if best_utility < total_utility:
             best_utility = total_utility

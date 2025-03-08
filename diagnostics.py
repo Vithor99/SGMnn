@@ -13,12 +13,12 @@ with open("last_sim.pkl", "rb") as f:
  
 st = [entry['st'] for _, entry in data.items()]
 a = [entry['a'] for _, entry in data.items()]
-u = [entry['u']*1000 for _, entry in data.items()] 
-y = [entry['y']*10 for _, entry in data.items()]
-k = [pair[1]*100 for pair in st]
+u = [entry['u'] for _, entry in data.items()]
+y = [entry['y'] for _, entry in data.items()]
+k = [pair[1] for pair in st]
 z = [pair[0] for pair in st]
-c = [pair[0]*10 for pair in a]
-n = [pair[1]*10 for pair in a]
+c = [pair[0] for pair in a]
+n = [pair[1] for pair in a]
 
 # distance from FOC 
 Euler = []
