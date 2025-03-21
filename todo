@@ -1,13 +1,13 @@
 
 1) convergenza migliore (piu stabile e piu utility)
-    a) hyperparameter search architetura modello
-    b) fare meglio output (standard deviation non dipende dalle azioni, inizializzazione a cazzo di cane, azioni bounded)
-    c) migliorare policy gradient (PPO, DDPG, PG fatto un po meglio)
-    d) target network
-    e) risolvere meglio nrmalizzazione degli stati
-    f) fare esplorazione meglio
-    g) simulazione in multi thread
-2) portare tutto su gpu
-3) forse cluster alfredo
 
-4) simulazioni piu high-dimensional and stochastic
+    a) random initial state
+    b) salva stati
+    c) target network
+    d) hyperparameter search architetura modello
+    e) migliorare policy gradient (PPO, DDPG, PG fatto un po meglio)
+    f) fare esplorazione meglio
+
+2) simulazioni piu high-dimensional and stochastic
+
+3) forse cluster alfredo

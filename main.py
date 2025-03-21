@@ -3,7 +3,8 @@ import torch
 import matplotlib.pyplot as plt
 import pickle
 from simulation import Model
-from NN_model import ActorCritic
+from rl_algos.actor_critic import ActorCritic
+from rl_algos.soft_actor_critic import SoftActorCritic
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
@@ -48,7 +49,7 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp + "long_no_adv_norm_2_no_clip")
+writer = SummaryWriter("logs/"+name_exp + "_random")
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
@@ -89,7 +90,15 @@ agent = ActorCritic(input_dim=state_dim,
 register(
     id="model",
     entry_point="simulation:Model",
-    kwargs={'k': k_ss, 'gamma': ss.gamma, 'psi': ss.psi, 'delta': ss.delta, 'rhoa': ss.rhoa, 'alpha': ss.alpha, 'T': 1000},
+    kwargs={'k': k_ss,
+            'var_k': 0.5*k_ss,
+            'gamma': ss.gamma,
+            'psi': ss.psi,
+            'delta': ss.delta,
+            'rhoa': ss.rhoa,
+            'alpha': ss.alpha,
+            'T': 1000,
+            'noise': 0.001},
 )
 
 def make_env():
@@ -108,6 +117,7 @@ T = 1000
 EPOCHS = 40000
 frq_train = 3
 frq_test = 100
+n_eval = 10
 best_utility = -np.inf
 
 for iter in tqdm(range(EPOCHS)):
@@ -147,31 +157,35 @@ for iter in tqdm(range(EPOCHS)):
 
         '''qua sto testando la policy media'''
 
-        last_sim = {}
-        all_actions = np.zeros((T, 2))
-
-        st, _ = test_sim.reset()
         total_utility = 0
-        for t in range(T):
-            st_tensor = torch.from_numpy(st).float().to(device)
-            with torch.no_grad():
-                action_tensor, log_prob = agent.get_action(st_tensor, test=True)
-                a = action_tensor.squeeze().numpy()
-                st1, u, done, _, y = test_sim.step(a)
-                y = y['y']
+        for _ in range(n_eval):
+            last_sim = {}
+            all_actions = np.zeros((T, 2))
 
-                last_sim[t] = {'st': st,
-                               'a': a,
-                               'u': u,
-                               'st1': st1,
-                               'y': y}
-                all_actions[t, :] = a
+            st, _ = test_sim.reset()
 
-                st = st1
-                total_utility += (agent.gamma ** t) * u
+            for t in range(T):
+                st_tensor = torch.from_numpy(st).float().to(device)
+                with torch.no_grad():
+                    action_tensor, log_prob = agent.get_action(st_tensor, test=True)
+                    a = action_tensor.squeeze().numpy()
+                    st1, u, done, _, y = test_sim.step(a)
+                    y = y['y']
 
-                if done:
-                    break
+                    last_sim[t] = {'st': st,
+                                   'a': a,
+                                   'u': u,
+                                   'st1': st1,
+                                   'y': y}
+                    all_actions[t, :] = a
+
+                    st = st1
+                    total_utility += (agent.gamma ** t) * u
+
+                    if done:
+                        break
+
+        total_utility /= n_eval
 
         writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
         writer.add_scalar("improvement over random policy", (total_utility-random_util)/(v_ss-random_util), iter)
@@ -186,6 +200,8 @@ for iter in tqdm(range(EPOCHS)):
 
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
+
+            agent.save("modello_bello")
 
 
         # plt.plot(utilities_train)

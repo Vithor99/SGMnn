@@ -6,7 +6,7 @@ from gymnasium import spaces
 
 class Model(gym.Env):
 
-    def __init__(self, k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0):
+    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0):
         super().__init__()
 
         self.observation_space = spaces.Box(
@@ -25,12 +25,14 @@ class Model(gym.Env):
         self.rhoa = rhoa #AR coff 
         self.alpha = alpha #prduction function
         self.k0 = k
+        self.var_k = var_k
+        self.noise = noise
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.time = 0
         self.state[0] = 0
-        self.state[1] = self.k0
+        self.state[1] = np.random.uniform(low=self.k0-self.var_k, high=self.k0+self.var_k) #self.k0
         obs = np.array(self.state, dtype=np.float32)
         return obs, {'y': 0}
     
@@ -61,7 +63,7 @@ class Model(gym.Env):
             #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
 
-        new_productivity = self.rhoa*z #+ np.random.normal(0, 0.01)  # updates tech.lvl
+        new_productivity = self.rhoa*z + np.random.normal(0, self.noise)  # updates tech.lvl
         #rescale magnitudes to feed into NN
         # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
 

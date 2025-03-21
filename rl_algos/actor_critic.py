@@ -1,10 +1,11 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import random
-from utils import Memory, BatchData
+from utils import BatchData
 
 from model_architectures import ValueNetwork, StochasticPolicyNetwork
 
@@ -88,8 +89,13 @@ class ActorCritic(nn.Module):
 
         return loss_V.detach().item(), policy_loss.detach().item()
 
+    def save(self, file_name):
+        if not os.path.exists("saved_models"):
+            os.mkdir("saved_models")
+        torch.save(self.state_dict(), "saved_models/" + file_name + ".pt")
 
-
+    def load(self, file_name):
+        self.load_state_dict(torch.load("saved_models/" + file_name + ".pt"))
 
 
 
