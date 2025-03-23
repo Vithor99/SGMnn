@@ -31,7 +31,7 @@ class Model(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.time = 0
-        self.state[0] = 0
+        self.state[0] = 1
         self.state[1] = np.random.uniform(low=self.k0-self.var_k, high=self.k0+self.var_k) #self.k0
         obs = np.array(self.state, dtype=np.float32)
         return obs, {'y': 0}
@@ -45,7 +45,7 @@ class Model(gym.Env):
         n = action[1]
 
         #compute Penalty / reward
-        y = np.exp(z)*(k**self.alpha) * (n**(1-self.alpha))
+        y = z*(k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             # return s, torch.tensor(-0.001).float().to(self.device), y/10, True
@@ -55,19 +55,18 @@ class Model(gym.Env):
                     + np.maximum(n - 1, 0)
                     + np.maximum(c - y, 0)
             )
-            new_capital = (1-self.delta)*k
+            k1 = (1-self.delta)*k
         else:
-            investment = y - c
-            new_capital = (1-self.delta)*k+investment  # updates Capital level
+            k1 = (1-self.delta)*k + y - c  # updates Capital level
             
             #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
 
-        new_productivity = self.rhoa*z + np.random.normal(0, self.noise)  # updates tech.lvl
+        z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)  # updates tech.lvl
         #rescale magnitudes to feed into NN
         # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
 
-        self.state = np.stack([new_productivity, new_capital])
+        self.state = np.stack([z1, k1])
         new_state = np.array(self.state, dtype=np.float32)
 
         self.time += 1

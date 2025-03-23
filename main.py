@@ -106,7 +106,7 @@ def make_env():
 
 test_sim = gym.make("model")
 
-random_util = ss.get_random_policy_utility(test_sim)
+#random_util = ss.get_random_policy_utility(test_sim)
 
 sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 # sims = gym.make_vec("model", num_envs=args.n_workers, vectorization_mode="async")
@@ -158,9 +158,14 @@ for iter in tqdm(range(EPOCHS)):
         '''qua sto testando la policy media'''
 
         total_utility = 0
+        euler_gap = 0
+        labor_gap = 0
+        random_util = 0
+
         for _ in range(n_eval):
             last_sim = {}
             all_actions = np.zeros((T, 2))
+
 
             st, _ = test_sim.reset()
 
@@ -178,22 +183,45 @@ for iter in tqdm(range(EPOCHS)):
                                    'st1': st1,
                                    'y': y}
                     all_actions[t, :] = a
-
                     st = st1
                     total_utility += (agent.gamma ** t) * u
+                    
+                    #distance from FOC
+                    if t>0:
+                        k0 = last_sim[t-1]['st'][1]
+                        k1 = last_sim[t]['st'][1]
+                        z0 = last_sim[t-1]['st'][0]
+                        E_z1 = (1-ss.rhoa) + ss.rhoa * z0
+                        c0 = all_actions[t-1,0]
+                        c1 = all_actions[t,0]
+                        n0 = all_actions[t-1,1]
+                        n1 = all_actions[t,1]
+
+                        euler_gap += (k1)**(1-ss.alpha)*(c1/c0) - ss.beta*((k1)**(1-ss.alpha)*(1 - ss.delta) + E_z1 * ss.alpha * (n1)**(1-ss.alpha))
+                        labor_gap += (ss.psi/(1-n0)) - (ss.gamma/c0)*(z0*(1-ss.alpha)*((k0/n0)**ss.alpha))
+
 
                     if done:
                         break
+            #distance from random policy: same initial capital, same shocks. 
+            random_util += ss.get_random_policy_utility(last_sim, T)
+            
 
         total_utility /= n_eval
+        euler_gap /= n_eval*T 
+        labor_gap /= n_eval*T
+        random_util /= n_eval
 
-        writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
-        writer.add_scalar("improvement over random policy", (total_utility-random_util)/(v_ss-random_util), iter)
-
+        #writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
+        writer.add_scalar("Euler gap", euler_gap, iter) 
+        writer.add_scalar("Euler gap", labor_gap, iter)
+        writer.add_scalar("improvement over random policy", (total_utility-random_util)/(random_util), iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
-        writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1, 0]-c_ss)+np.abs(all_actions[-1, 0]-c_ss), iter)
-        writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1, 1]-n_ss)+np.abs(all_actions[-1, 1]-n_ss), iter)
+
+
+        #writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1, 0]-c_ss)+np.abs(all_actions[-1, 0]-c_ss), iter)
+        #writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1, 1]-n_ss)+np.abs(all_actions[-1, 1]-n_ss), iter)
 
         if best_utility < total_utility:
             best_utility = total_utility

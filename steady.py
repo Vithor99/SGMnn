@@ -60,18 +60,25 @@ class steady:
         ee = (self.gamma/np.sqrt(c)) - self.beta*(self.gamma/np.sqrt(c1))*((1-self.delta)+self.alpha*k1**(self.alpha-1)*n1**(1-self.alpha)) 
         return ls, ee
 
-    def get_random_policy_utility(self, sim):
+    def get_random_policy_utility(self, last_sim, T):
         upper_bound_1 = 1.0
-        upper_bound_0 = lambda s0, s1, alpha, a1: np.exp(s0) * (s1**alpha * a1**(1-alpha))
+        upper_bound_0 = lambda s0, s1, alpha, a1: s0 * (s1**alpha * a1**(1-alpha))
 
-        st, _ = sim.reset()
+        #st, _ = sim.reset()
+        st = np.array([1, last_sim[0]['st'][1]])
+        z = [v['st1'][0] for v in last_sim.values()]
         random_util = 0
-        for t in range(1000):
+        for t in range(T):
             rnd_a_1 = np.random.uniform(0.0, upper_bound_1)
             rnd_a_0 = np.random.uniform(0.0, upper_bound_0(st[0], st[1], self.alpha, rnd_a_1))
-            a = np.array([rnd_a_0, rnd_a_0])
-            st, u, done, _, y = sim.step(a)
-            random_util += self.beta ** t * u
+            a = np.array([rnd_a_0, rnd_a_1])
+
+            y = st[0]*(st[1]**self.alpha) * (rnd_a_1**(1-self.alpha))
+            u = self.gamma*np.log(rnd_a_0)+self.psi*np.log(1-rnd_a_1)
+            k1 =  (1-self.delta)*st[1] + y - rnd_a_0
+            st = np.array([z[t], k1])
+            #st, u, done, _, y = sim.step(a)
+            random_util += (self.beta ** t) * u
 
         return random_util
     
