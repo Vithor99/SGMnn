@@ -16,15 +16,13 @@ from gymnasium.vector import SyncVectorEnv
 
 
 ss = steady()
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-2.0, type=float)
+parser.add_argument('--policy_var', default=-4.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -33,9 +31,7 @@ parser.add_argument('--learn_std', default=0, type=int)
 parser.add_argument('--use_hard_bounds', default=1, type=int)
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
-
 args = parser.parse_args()
-
 seed = args.seed
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -49,7 +45,7 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp + "_random")
+writer = SummaryWriter("logs/"+name_exp + "_random3")
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
@@ -112,7 +108,9 @@ sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 # sims = gym.make_vec("model", num_envs=args.n_workers, vectorization_mode="async")
 # sims = gym.make_vec("model", num_envs=args.n_workers, vectorization_mode="sync")
 
-
+'''
+Start Training the model 
+'''
 T = 1000
 EPOCHS = 40000
 frq_train = 3
@@ -141,7 +139,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("train utility", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
+    writer.add_scalar("train utility", total_utility, iter) # v_ss-total_utility
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -153,6 +151,9 @@ for iter in tqdm(range(EPOCHS)):
             writer.add_scalar("policy loss", p_loss, iter)
 
 
+    '''
+    Start Testing the model 
+    '''
     if iter % frq_test == (frq_test-1):
 
         '''qua sto testando la policy media'''
@@ -161,6 +162,7 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap = 0
         labor_gap = 0
         random_util = 0
+        last_action = 0
 
         for _ in range(n_eval):
             last_sim = {}
@@ -168,6 +170,7 @@ for iter in tqdm(range(EPOCHS)):
 
 
             st, _ = test_sim.reset()
+            rnd_state0 = st[1]
 
             for t in range(T):
                 st_tensor = torch.from_numpy(st).float().to(device)
@@ -183,9 +186,13 @@ for iter in tqdm(range(EPOCHS)):
                                    'st1': st1,
                                    'y': y}
                     all_actions[t, :] = a
-                    st = st1
                     total_utility += (agent.gamma ** t) * u
-                    
+
+                    #random policy 
+                    rnd_util, rnd_state1 = ss.get_random_util(st[0], rnd_state0)
+                    random_util += (agent.gamma ** t) * rnd_util
+                    rnd_state0 = rnd_state1
+
                     #distance from FOC
                     if t>0:
                         k0 = last_sim[t-1]['st'][1]
@@ -196,26 +203,33 @@ for iter in tqdm(range(EPOCHS)):
                         c1 = all_actions[t,0]
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
+                        euler_gap += (c1/c0) - ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
+                        labor_gap += (c0/ss.gamma)*(ss.psi/(1-n0)) - (z0*(1-ss.alpha)*((k0/n0)**ss.alpha))
+                    
+                    if t==T-1:
+                        last_action += a
 
-                        euler_gap += (k1)**(1-ss.alpha)*(c1/c0) - ss.beta*((k1)**(1-ss.alpha)*(1 - ss.delta) + E_z1 * ss.alpha * (n1)**(1-ss.alpha))
-                        labor_gap += (ss.psi/(1-n0)) - (ss.gamma/c0)*(z0*(1-ss.alpha)*((k0/n0)**ss.alpha))
+                    
+                    st = st1
 
 
                     if done:
                         break
             #distance from random policy: same initial capital, same shocks. 
-            random_util += ss.get_random_policy_utility(last_sim, T)
+            #random_util += ss.get_random_policy_utility(last_sim, T)
             
 
         total_utility /= n_eval
         euler_gap /= n_eval*T 
         labor_gap /= n_eval*T
         random_util /= n_eval
+        last_action /= n_eval
 
         #writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
         writer.add_scalar("Euler gap", euler_gap, iter) 
-        writer.add_scalar("Euler gap", labor_gap, iter)
-        writer.add_scalar("improvement over random policy", (total_utility-random_util)/(random_util), iter)
+        writer.add_scalar("Labor gap", labor_gap, iter)
+        writer.add_scalar("improvement over random policy", (total_utility / random_util), iter)
+        writer.add_scalar("distance from steady state", np.abs(last_action[0]-c_ss), iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
 
