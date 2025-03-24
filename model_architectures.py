@@ -19,8 +19,9 @@ class ValueNetwork(nn.Module):
         layers += [nn.Linear(architecture_params['n_neurons'], output_dim)]
         self.network = nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, a=None):
         x = state_preprocessor(x)
+        x = x if a is None else torch.cat([x, a], -1)
         return self.network(x)
 
 
