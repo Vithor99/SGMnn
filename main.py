@@ -14,15 +14,17 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
-
+# Retrieve model class for parameter values, steady state values and other functions
 ss = steady()
+
+#setting the architecture 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-4.0, type=float)
+parser.add_argument('--policy_var', default=-4, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -32,6 +34,8 @@ parser.add_argument('--use_hard_bounds', default=1, type=int)
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
+
+#Saving the seed 
 seed = args.seed
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -45,7 +49,7 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp + "_random4")
+writer = SummaryWriter("logs/"+name_exp + "_random7")
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
@@ -58,7 +62,7 @@ action_bounds = {
     ''
     'min': [lambda: 0,
             lambda: 0],
-    'max': [lambda s0, s1, alpha, a1: torch.exp(s0) * (s1**alpha * a1**(1-alpha)),
+    'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
             lambda s0, s1, alpha, a1: 1.0]
     }
 
@@ -115,7 +119,7 @@ T = 1000
 EPOCHS = 40000
 frq_train = 3
 frq_test = 100
-n_eval = 1 #0
+n_eval = 5 #0
 best_utility = -np.inf
 
 for iter in tqdm(range(EPOCHS)):
@@ -129,6 +133,7 @@ for iter in tqdm(range(EPOCHS)):
             action_tensor, log_prob = agent.get_action(st_tensor)
             a = action_tensor.numpy()
             st1, u, done, _, y = sims.step(a)
+            #u_debug = ss.gamma*np.log(a[0]) + ss.psi * np.log(1-a[1])
 
             y = y['y']
             for i in range(args.n_workers):
@@ -139,7 +144,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("train utility", total_utility, iter) # v_ss-total_utility
+    writer.add_scalar("train utility", v_ss-total_utility, iter) # v_ss-total_utility (should not go negative in a stable way) 
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -162,7 +167,9 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap = 0
         labor_gap = 0
         random_util = 0
-        last_action = 0
+        last_state = 0
+        last_cons = 0 
+        last_lab =  0
 
         for _ in range(n_eval):
             last_sim = {}
@@ -203,11 +210,20 @@ for iter in tqdm(range(EPOCHS)):
                         c1 = all_actions[t,0]
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
-                        euler_gap += (c1/c0) - ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
-                        labor_gap += (c0/ss.gamma)*(ss.psi/(1-n0)) - (z0*(1-ss.alpha)*((k0/n0)**ss.alpha))
+                        c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
+                        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
+                        c_ratio = c1/c0
+                        
+                        #euler_gap += (c1/c0) - ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
+                        #labor_gap += (c0/ss.gamma)*(ss.psi/(1-n0)) - z0*(1-ss.alpha)*((k0**ss.alpha)*(n0**(-ss.alpha)))
+                        labor_gap += np.abs((c0 - c0_star)/c0_star)
+                        euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+                    
                     
                     if t==T-1:
-                        last_action += a
+                        last_state += st1[1]
+                        last_cons += all_actions[t,0]
+                        last_lab += all_actions[t, 1]
 
                     
                     st = st1
@@ -223,13 +239,18 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap /= n_eval*T 
         labor_gap /= n_eval*T
         random_util /= n_eval
-        last_action /= n_eval
+        last_state /= n_eval
+        last_cons /= n_eval 
+        last_lab /= n_eval
 
         #writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
+        # do not use v_ss here because its compute on 100 periods
         writer.add_scalar("Euler gap", euler_gap, iter) 
         writer.add_scalar("Labor gap", labor_gap, iter)
-        writer.add_scalar("improvement over random policy", (total_utility / random_util), iter)
-        writer.add_scalar("distance from steady state", np.abs(last_action[0]-c_ss), iter)
+        writer.add_scalar("total value", total_utility , iter) #(total_utility - random_util) / (random_util)
+        writer.add_scalar("k gap", last_state - k_ss, iter)
+        writer.add_scalar("c gap", last_cons - c_ss, iter)
+        writer.add_scalar("n gap", last_lab - n_ss, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
 
@@ -243,7 +264,7 @@ for iter in tqdm(range(EPOCHS)):
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
 
-            agent.save("modello_bello")
+            agent.save("rbc_stoch_var4")
 
 
         # plt.plot(utilities_train)

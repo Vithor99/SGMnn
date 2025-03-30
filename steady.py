@@ -34,10 +34,13 @@ class steady:
         u_ss = self.gamma*np.log(c_ss)+self.psi*np.log(1-n_ss)
 
         v_ss = 0
-        for t in range(1000):
-            v_ss += self.beta**t * u_ss
+        for t in range(100):
+            v_ss += (self.beta**t) * u_ss
+        
         return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss
     
+        #include a function that computes the value with the number of periods as input 
+
     def ss_adj(self):
         c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = self.ss()
         c_ss = c_ss
@@ -46,7 +49,7 @@ class steady:
         y_ss = (k_ss)**self.alpha * (n_ss)**(1-self.alpha)
         u_ss = u_ss
         v_ss = 0
-        for t in range(1000):
+        for t in range(100):
             v_ss += self.beta**t * u_ss
         return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss
     

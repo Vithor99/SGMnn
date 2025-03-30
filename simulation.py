@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import gymnasium as gym
 from gymnasium import spaces
+import warnings
 
 
 class Model(gym.Env):
@@ -45,10 +46,11 @@ class Model(gym.Env):
         n = action[1]
 
         #compute Penalty / reward
-        y = z*(k**self.alpha) * (n**(1-self.alpha))
+        y = z* (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             # return s, torch.tensor(-0.001).float().to(self.device), y/10, True
+            '''
             U = - (
                     np.maximum(-c, 0)
                     + np.maximum(-n, 0)
@@ -56,11 +58,17 @@ class Model(gym.Env):
                     + np.maximum(c - y, 0)
             )
             k1 = (1-self.delta)*k
+        
+            '''
+            U = self.gamma*np.log(c)+self.psi*np.log(1-n)
+            k1 = (1-self.delta)*k + y - c  # updates Capital level
+            values = c/y #debugging
+            warnings.warn(f"Bounds are not working: {values}") #debugging
         else:
             k1 = (1-self.delta)*k + y - c  # updates Capital level
             
             #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
-            U = self.gamma*np.log(c)+self.psi*np.log(1-n)
+            U = self.gamma*np.log(c) + self.psi*np.log(1-n)
 
         z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)  # updates tech.lvl
         #rescale magnitudes to feed into NN
