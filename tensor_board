@@ -1,15 +1,10 @@
 
-tensorboard --logdir ./logs   #access tensorboard
-rm -r ./logs/"name"                #delete log from tensorboard
+#access tensorboard
+tensorboard --logdir ./logs  
 
-other notes:
+ #delete log from tensorboard
+rm -r ./logs/"name"               
 
-- values in NN for both states and acions should have maginitudes ranging around (0.0, 0.2)
-- k - 0.14
-- c - 0.11
-- n - 0.05
-
-modello da battere: var -5 --> -8.490396521665389e-05
 
 
 

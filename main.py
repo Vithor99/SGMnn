@@ -49,7 +49,7 @@ name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
 
-writer = SummaryWriter("logs/"+name_exp + "_random7")
+writer = SummaryWriter("logs/"+name_exp + "_determ2")
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
@@ -91,7 +91,7 @@ register(
     id="model",
     entry_point="simulation:Model",
     kwargs={'k': k_ss,
-            'var_k': 0.5*k_ss,
+            'var_k': 0.1*k_ss,
             'gamma': ss.gamma,
             'psi': ss.psi,
             'delta': ss.delta,
@@ -115,19 +115,20 @@ sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 '''
 Start Training the model 
 '''
-T = 1000
+T = 500
 EPOCHS = 40000
 frq_train = 3
-frq_test = 100
+frq_test = 500 #100
 n_eval = 5 #0
 best_utility = -np.inf
+best_metric = -np.inf
 
 for iter in tqdm(range(EPOCHS)):
 
     st, _ = sims.reset()
     total_utility = 0
 
-    for t in range(100):
+    for t in range(500):
         st_tensor = torch.from_numpy(st).float().to(device)
         with torch.no_grad():
             action_tensor, log_prob = agent.get_action(st_tensor)
@@ -144,7 +145,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("train utility", v_ss-total_utility, iter) # v_ss-total_utility (should not go negative in a stable way) 
+    writer.add_scalar("train utility", total_utility, iter) # v_ss-total_utility (should not go negative in a stable way) 
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -176,7 +177,7 @@ for iter in tqdm(range(EPOCHS)):
             all_actions = np.zeros((T, 2))
 
 
-            st, _ = test_sim.reset()
+            st, _ = test_sim.reset() #options="test_mode"
             rnd_state0 = st[1]
 
             for t in range(T):
@@ -257,15 +258,22 @@ for iter in tqdm(range(EPOCHS)):
 
         #writer.add_scalar("distance of action 0 from ss", np.abs(all_actions[1, 0]-c_ss)+np.abs(all_actions[-1, 0]-c_ss), iter)
         #writer.add_scalar("distance of action 1 from ss", np.abs(all_actions[1, 1]-n_ss)+np.abs(all_actions[-1, 1]-n_ss), iter)
-
+        ''' 
         if best_utility < total_utility:
             best_utility = total_utility
 
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
 
-            agent.save("rbc_stoch_var4")
+            agent.save("rbc_det_var4")
+        '''
+        if best_metric < total_utility:
+            best_metric = total_utility
 
+            with open("last_sim.pkl", "wb") as f:
+                pickle.dump(last_sim, f)
+
+            agent.save("rbc_det_var4")
 
         # plt.plot(utilities_train)
         # plt.title('Train Utility')

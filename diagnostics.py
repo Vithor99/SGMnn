@@ -72,7 +72,7 @@ agent = ActorCritic(input_dim=state_dim,
                     learn_std=args.learn_std==1,
                     device=device).to(device)
 
-checkpoint_path = 'saved_models/modello_bello.pt'
+checkpoint_path = 'saved_models/rbc_det_var4.pt'
 agent.load_state_dict(torch.load(checkpoint_path, map_location=device))
 agent.eval()
 
@@ -94,9 +94,9 @@ optimal_n  = interp1d(kgrid, control_star[:, 1], kind="cubic", bounds_error=Fals
 ''' SIMULATIONS '''
 
 
-dev = 1.09
+dev = 1.05
 k = np.array([k_ss*dev, k_ss*dev])
-T = 1000
+T = 500
 grid_sim={}
 rl_sim={}
 grid_v = 0
@@ -141,9 +141,30 @@ plt.show()
 
 #I want to get out a k path, c path, n path and value achieved 
 
+c_grid = [entry['a'][0] for entry in grid_sim.values()]
+c_rl = [entry['a'][0] for entry in rl_sim.values()]
+
+plt.plot(c_grid, color='blue', label='c_grid')
+plt.plot(c_rl, color='red', label='c_rl')
+plt.axhline(c_ss, color="green", label='c_ss')
+plt.title("c")
+plt.legend()
+plt.show()
 
 
+n_grid = [entry['a'][1] for entry in grid_sim.values()]
+n_rl = [entry['a'][1] for entry in rl_sim.values()]
 
+plt.plot(n_grid, color='blue', label='n_grid')
+plt.plot(n_rl, color='red', label='n_rl')
+plt.axhline(n_ss, color="green", label='n_ss')
+plt.title("n")
+plt.legend()
+plt.show()
+
+plt.bar("grid_v", grid_v)
+plt.bar("rl_v", rl_v)
+plt.show()
 
 
 ''' version for deterministic model'''

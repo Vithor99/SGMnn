@@ -1,7 +1,10 @@
 
 1) convergenza migliore (piu stabile e piu utility)
 
-    a) random initial state
+    a1) model selection during testing: test model on the same set of k0 and select highest utility 
+    a2) either train model with more than 100 steps or make sure that for largest k0 there is enough time to get to kss
+    a3) in diagnosis test to see which policy achieves better utility
+
     b) salva stati
     c) target network
     d) hyperparameter search architetura modello
