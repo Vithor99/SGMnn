@@ -7,7 +7,7 @@ import warnings
 
 class Model(gym.Env):
 
-    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0):
+    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
         super().__init__()
 
         self.observation_space = spaces.Box(
@@ -28,16 +28,17 @@ class Model(gym.Env):
         self.k0 = k
         self.var_k = var_k
         self.noise = noise
+        self.version = version
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.time = 0
         self.state[0] = 1
 
-        if options=="ss_mode":
+        if options=="steady":
             self.state[1] = self.k0
         else:
-            self.state[1] = np.random.uniform(low=self.k0-self.var_k, high=self.k0+self.var_k) #self.k0
+            self.state[1] = np.random.uniform(low=self.k0-self.var_k, high=self.k0+self.var_k) 
 
         obs = np.array(self.state, dtype=np.float32)
         return obs, {'y': 0}
@@ -54,6 +55,7 @@ class Model(gym.Env):
         #compute Penalty / reward
         y = z* (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
+
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
             k1 = (1-self.delta)*k + y - c                      #updates Capital level
@@ -63,9 +65,10 @@ class Model(gym.Env):
             U = self.gamma*np.log(c) + self.psi*np.log(1-n)
             k1 = (1-self.delta)*k + y - c  # updates Capital level
 
-        z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)  # updates tech.lvl
-        #rescale magnitudes to feed into NN
-        # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
+        if self.version =="deterministic":
+            z1 = (1-self.rhoa) + self.rhoa*z  # updates tech.lvl
+        else:
+            z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)
 
         self.state = np.stack([z1, k1])
         new_state = np.array(self.state, dtype=np.float32)

@@ -14,10 +14,20 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
-# Retrieve model class for parameter values, steady state values and other functions
-ss = steady()
+'''CONTROLS'''
+#deterministic runs version without shocks, None runs stochastic 
+version = "stochastic" # deterministic ; stochastic 
 
-#setting the Architecture 
+#steady starts capital from ss, None from a uniform dist around ss with var_k0
+initial_k = "random" # steady ; random 
+var_k0 = 0.1 
+
+#string to indicate type in logs
+model_type = initial_k + "_" + version
+
+
+'''SETTING PARAMETERS''' 
+ss = steady()
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
@@ -48,8 +58,7 @@ device = torch.device('cpu')
 name_exp = ''
 for k, v in args.__dict__.items():
     name_exp += str(k) + "=" + str(v) + "_"
-
-writer = SummaryWriter("logs/"+name_exp + "_stoch")
+writer = SummaryWriter("logs/"+ name_exp + str(model_type))
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
@@ -91,14 +100,15 @@ register(
     id="model",
     entry_point="simulation:Model",
     kwargs={'k': k_ss,
-            'var_k': 0.1*k_ss,
+            'var_k': var_k0*k_ss,
             'gamma': ss.gamma,
             'psi': ss.psi,
             'delta': ss.delta,
             'rhoa': ss.rhoa,
             'alpha': ss.alpha,
-            'T': 1000,
-            'noise': 0.001},
+            'T': 1000,        #we can remove no? 
+            'noise': ss.var_eps_z,
+            'version': version},
 )
 
 def make_env():
@@ -122,13 +132,13 @@ frq_train = 3
 
 T_test = 500
 vss_test = ss.ss_value(T_test)
-frq_test = 10 #100
+frq_test = 500 #100
 n_eval = 5 #0
 best_utility = -np.inf
 
 for iter in tqdm(range(EPOCHS)):
 
-    st, _ = sims.reset() #options="ss_mode" to fic inital k0 to k_ss
+    st, _ = sims.reset(options=initial_k) 
     total_utility = 0
 
     for t in range(T_train):
@@ -170,17 +180,17 @@ for iter in tqdm(range(EPOCHS)):
         total_utility = 0
         euler_gap = 0
         labor_gap = 0
-        #random_util = 0
         last_state = 0
         last_cons = 0 
         last_lab =  0
+        #random_util = 0
 
         for _ in range(n_eval):
             last_sim = {}
             all_actions = np.zeros((T_test, 2))
 
 
-            st, _ = test_sim.reset() #options="ss_mode" to fic inital k0 to k_ss
+            st, _ = test_sim.reset(options=initial_k) 
             rnd_state0 = st[1]
 
             for t in range(T_test):
@@ -244,8 +254,6 @@ for iter in tqdm(range(EPOCHS)):
         last_lab /= n_eval
         #random_util /= n_eval
 
-        #writer.add_scalar("opt utility dist", v_ss-total_utility, iter) # np.abs(total_utility-v_ss)
-        # do not use v_ss here because its compute on 100 periods
         writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap, iter) 
         writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap, iter)
         writer.add_scalar("total value", (vss_test-total_utility)/total_utility , iter) 
@@ -262,7 +270,7 @@ for iter in tqdm(range(EPOCHS)):
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
 
-            agent.save("rbc_stoch_var4")
+            agent.save("RBC_"+ str(model_type))
        
 
 

@@ -10,7 +10,7 @@ class steady:
         self.delta = 0.025 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
-
+        self.var_eps_z = 0.001 #variance of TFP shock 
         self.states = 2 
         self.actions = 2
     
