@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import pickle
+import os
 from simulation import Model
 from rl_algos.actor_critic import ActorCritic
 from rl_algos.soft_actor_critic import SoftActorCritic
@@ -9,7 +10,6 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
 from steady import steady
-
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
@@ -56,9 +56,17 @@ torch.cuda.manual_seed(seed)
 device = torch.device('cpu')
 
 name_exp = ''
+
+#for k, v in args.__dict__.items():
+#    name_exp += str(k) + "=" + str(v) + "_"
+
 for k, v in args.__dict__.items():
-    name_exp += str(k) + "=" + str(v) + "_"
-writer = SummaryWriter("logs/"+ name_exp + str(model_type))
+    if k == 'policy_var':
+        name_exp += str(k) + "=" + str(v) + "_"
+        break
+name_exp += str(model_type)
+
+writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
