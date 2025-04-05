@@ -37,21 +37,16 @@ class steady:
         for t in range(100):
             v_ss += (self.beta**t) * u_ss
         
-        return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss
+        return c_ss, n_ss, k_ss, y_ss, u_ss
     
         #include a function that computes the value with the number of periods as input 
-
-    def ss_adj(self):
-        c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = self.ss()
-        c_ss = c_ss
-        n_ss = n_ss
-        k_ss = k_ss
-        y_ss = (k_ss)**self.alpha * (n_ss)**(1-self.alpha)
-        u_ss = u_ss
+    def ss_value(self, T):
+        u_ss = self.ss()[-1]
         v_ss = 0
-        for t in range(100):
-            v_ss += self.beta**t * u_ss
-        return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss
+        for t in range(T):
+            v_ss += (self.beta**t) * u_ss
+
+        return v_ss 
     
     def foc_log(self, c, c1, n, n1, k, k1):
         ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(c/(1-n))
@@ -102,4 +97,4 @@ class steady:
 
 
 ss = steady()
-c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_adj()
+c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()

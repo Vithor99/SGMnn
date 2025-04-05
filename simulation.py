@@ -34,7 +34,7 @@ class Model(gym.Env):
         self.time = 0
         self.state[0] = 1
 
-        if options=="test_mode":
+        if options=="ss_mode":
             self.state[1] = self.k0
         else:
             self.state[1] = np.random.uniform(low=self.k0-self.var_k, high=self.k0+self.var_k) #self.k0
@@ -42,14 +42,7 @@ class Model(gym.Env):
         obs = np.array(self.state, dtype=np.float32)
         return obs, {'y': 0}
     
-    def reset_test(self, options=None):
-        #super().reset_test(seed=seed)
-        self.time = 0
-        self.state[0] = 1
-        self.state[1] = self.k0
-        obs = np.array(self.state, dtype=np.float32)
-        return obs, {'y': 0}
-    
+
     def step(self, action):
 
         #rescale magnitueds coming from NN
@@ -62,28 +55,15 @@ class Model(gym.Env):
         y = z* (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
-            # return s, torch.tensor(-0.001).float().to(self.device), y/10, True
-            '''
-            U = - (
-                    np.maximum(-c, 0)
-                    + np.maximum(-n, 0)
-                    + np.maximum(n - 1, 0)
-                    + np.maximum(c - y, 0)
-            )
-            k1 = (1-self.delta)*k
-        
-            '''
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c  # updates Capital level
-            values = c/y #debugging
+            k1 = (1-self.delta)*k + y - c                      #updates Capital level
+            values = c/y                                       #debugging
             warnings.warn(f"Bounds are not working: {values}") #debugging
         else:
-            k1 = (1-self.delta)*k + y - c  # updates Capital level
-            
-            #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
             U = self.gamma*np.log(c) + self.psi*np.log(1-n)
+            k1 = (1-self.delta)*k + y - c  # updates Capital level
 
-        z1 = (1-self.rhoa) + self.rhoa*z #+ np.random.normal(0, self.noise)  # updates tech.lvl
+        z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)  # updates tech.lvl
         #rescale magnitudes to feed into NN
         # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
 
@@ -97,55 +77,6 @@ class Model(gym.Env):
             done = True
 
         return new_state, U, done, False, {'y': y}
-    
-    def step_test(self, action):
-
-        #rescale magnitueds coming from NN
-        z = self.state[0]
-        k = self.state[1]
-        c = action[0]
-        n = action[1]
-
-        #compute Penalty / reward
-        y = z* (k**self.alpha) * (n**(1-self.alpha))
-        y = np.nan_to_num(y, nan=0.0)
-        if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
-            # return s, torch.tensor(-0.001).float().to(self.device), y/10, True
-            '''
-            U = - (
-                    np.maximum(-c, 0)
-                    + np.maximum(-n, 0)
-                    + np.maximum(n - 1, 0)
-                    + np.maximum(c - y, 0)
-            )
-            k1 = (1-self.delta)*k
-        
-            '''
-            U = self.gamma*np.log(c)+self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c  # updates Capital level
-            values = c/y #debugging
-            warnings.warn(f"Bounds are not working: {values}") #debugging
-        else:
-            k1 = (1-self.delta)*k + y - c  # updates Capital level
-            
-            #U = self.gamma*torch.sqrt(c)+self.psi*torch.sqrt(1-n)
-            U = self.gamma*np.log(c) + self.psi*np.log(1-n)
-
-        z1 = (1-self.rhoa) + self.rhoa*z #+ np.random.normal(0, self.noise)  # updates tech.lvl
-        #rescale magnitudes to feed into NN
-        # new_state = torch.tensor([new_productivity/10, new_capital/100]).float().to(self.device)
-
-        self.state = np.stack([z1, k1])
-        new_state = np.array(self.state, dtype=np.float32)
-
-        self.time += 1
-
-        done = False
-        if self.time >= self.T:
-            done = True
-
-        return new_state, U, done, False, {'y': y}
-
 
 
 

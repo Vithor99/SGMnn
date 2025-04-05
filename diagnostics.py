@@ -11,22 +11,26 @@ import argparse
 from steady import steady
 from scipy.interpolate import interp1d
 
-'''LOADING MODELS'''
+'''CONTROLS'''
+T = 500
+dev = 1.05
+rl_model = 'saved_models/rbc_stoch_var4.pt'
+grid_model = 'grid_data_dev10pct.pkl'
 
+'''LOADING MODELS'''
 # Loading model steady state
 ss = steady()
-c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
-
+c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+vss = ss.ss_value(T)
 
 # Loading RL policy
-ss = steady()
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-3.5, type=float)
+parser.add_argument('--policy_var', default=-4, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -37,12 +41,10 @@ parser.add_argument('--use_hard_bounds', default=1, type=int)
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
 device = torch.device('cpu')
-
 ''' Define Simulator'''
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
-
 action_bounds = {
     'order': [1, 0],
     ''
@@ -51,8 +53,6 @@ action_bounds = {
     'max': [lambda s0, s1, alpha, a1: s0 * (s1**alpha * a1**(1-alpha)),
             lambda s0, s1, alpha, a1: 1.0]
     }
-
-
 ''' Define Model'''
 architecture_params = {'n_layers': args.n_layers,
                        'n_neurons': args.n_neurons,
@@ -72,13 +72,12 @@ agent = ActorCritic(input_dim=state_dim,
                     learn_std=args.learn_std==1,
                     device=device).to(device)
 
-checkpoint_path = 'saved_models/rbc_det_var4.pt'
-agent.load_state_dict(torch.load(checkpoint_path, map_location=device))
+agent.load_state_dict(torch.load(rl_model, map_location=device))
 agent.eval()
 
-# Loading Grid (vi) policy
 
-with open('grid_data_dev10pct.pkl', 'rb') as f:
+# Loading Grid (vi) policy
+with open(grid_model, 'rb') as f:
     loaded_data = pickle.load(f)
 
 kgrid = loaded_data['kgrid']
@@ -92,11 +91,7 @@ optimal_n  = interp1d(kgrid, control_star[:, 1], kind="cubic", bounds_error=Fals
 
 
 ''' SIMULATIONS '''
-
-
-dev = 1.05
 k = np.array([k_ss*dev, k_ss*dev])
-T = 500
 grid_sim={}
 rl_sim={}
 grid_v = 0
@@ -129,6 +124,9 @@ for t in range(T):
 
     k = np.array([st1_rl, kp_grid])
 
+
+
+#Plotting
 k_grid = [entry['st'] for entry in grid_sim.values()]
 k_rl = [entry['st'][1] for entry in rl_sim.values()]
 
@@ -138,8 +136,6 @@ plt.axhline(k_ss, color="green", label='k_ss')
 plt.title("k")
 plt.legend()
 plt.show()
-
-#I want to get out a k path, c path, n path and value achieved 
 
 c_grid = [entry['a'][0] for entry in grid_sim.values()]
 c_rl = [entry['a'][0] for entry in rl_sim.values()]
@@ -151,7 +147,6 @@ plt.title("c")
 plt.legend()
 plt.show()
 
-
 n_grid = [entry['a'][1] for entry in grid_sim.values()]
 n_rl = [entry['a'][1] for entry in rl_sim.values()]
 
@@ -162,9 +157,14 @@ plt.title("n")
 plt.legend()
 plt.show()
 
-plt.bar("grid_v", grid_v)
-plt.bar("rl_v", rl_v)
-plt.show()
+print(f"Steady state value = {vss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
+print(f"Pct distance of RL to grid:{(rl_v - grid_v)*100/(grid_v)}") # if negative v_rl > v_grid
+
+
+
+
+
+
 
 
 ''' version for deterministic model'''
