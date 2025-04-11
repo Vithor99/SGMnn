@@ -20,10 +20,11 @@ version = "stochastic" # deterministic ; stochastic
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
 initial_k = "random" # steady ; random 
-var_k0 = 0.1 
+var_k0 = 0.1         #deviation from ss capital
 
-#string to indicate type in logs
-model_type = initial_k + "_" + version
+T_test = 500
+T_train = 500 
+frq_test = 500 
 
 
 '''SETTING PARAMETERS''' 
@@ -34,7 +35,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-4, type=float)
+parser.add_argument('--policy_var', default=-3.5, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -56,16 +57,19 @@ torch.cuda.manual_seed(seed)
 device = torch.device('cpu')
 
 name_exp = ''
-
-#for k, v in args.__dict__.items():
-#    name_exp += str(k) + "=" + str(v) + "_"
+#string to indicate type in logs
+model_type = initial_k + "_" + version
+sim_length = "train="+ str(T_train) + "_" + "test="+ str(T_test) + "_"
 
 for k, v in args.__dict__.items():
     if k == 'policy_var':
         name_exp += str(k) + "=" + str(v) + "_"
         break
-name_exp += str(model_type)
+#for k, v in args.__dict__.items():
+#    name_exp += str(k) + "=" + str(v) + "_"
 
+name_exp += str(model_type)
+name_exp += str(sim_length)
 writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
@@ -134,13 +138,10 @@ sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 Start Training the model 
 '''
 EPOCHS = 40000
-T_train = 500
 vss_train = ss.ss_value(T_train)
 frq_train = 3
 
-T_test = 500
 vss_test = ss.ss_value(T_test)
-frq_test = 500 #100
 n_eval = 5 #0
 best_utility = -np.inf
 
@@ -166,7 +167,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("train utility", (vss_train-total_utility)/total_utility , iter) # % distance from ss value 
+    writer.add_scalar("train utility", ((vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -217,12 +218,12 @@ for iter in tqdm(range(EPOCHS)):
                     all_actions[t, :] = a
                     total_utility += (agent.gamma ** t) * u
 
-                    '''
+                    
                     #random policy 
                     rnd_util, rnd_state1 = ss.get_random_util(st[0], rnd_state0)
                     random_util += (agent.gamma ** t) * rnd_util
-                    rnd_state0 = rnd_state1'
-                    '''
+                    rnd_state0 = rnd_state1
+                    
 
                     #distance from FOC
                     if t>0:
@@ -260,14 +261,15 @@ for iter in tqdm(range(EPOCHS)):
         last_state /= n_eval
         last_cons /= n_eval 
         last_lab /= n_eval
-        #random_util /= n_eval
+        random_util /= n_eval
 
-        writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap, iter) 
-        writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap, iter)
-        writer.add_scalar("total value", (vss_test-total_utility)/total_utility , iter) 
-        writer.add_scalar("k gap", last_state - k_ss, iter)
-        writer.add_scalar("c gap", last_cons - c_ss, iter)
-        writer.add_scalar("n gap", last_lab - n_ss, iter)
+        writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
+        writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap*100, iter)
+        writer.add_scalar("pct welfare gain of steady state to current policy", (-(vss_test-total_utility)/total_utility)*100 , iter)
+        writer.add_scalar("pct welfare gain of current policy to random policy", (-(total_utility-random_util)/random_util)*100 , iter) 
+        writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
+        writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
+        writer.add_scalar("pct distance of n to n_ss", (np.abs(last_lab - n_ss)/n_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
 

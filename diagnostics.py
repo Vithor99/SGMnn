@@ -13,8 +13,11 @@ from scipy.interpolate import interp1d
 
 '''CONTROLS'''
 T = 500
-dev = 1.05
-rl_model = 'saved_models/rbc_stoch_var4.pt'
+dev = 0.05
+
+zoom = "in" # in or out 
+zoom_factor = 0.1 # if zoom == "out" this is the factor of zooming in the plot
+rl_model = 'saved_models/RBC_steady_deterministic.pt'
 grid_model = 'grid_data_dev10pct.pkl'
 
 '''LOADING MODELS'''
@@ -91,7 +94,7 @@ optimal_n  = interp1d(kgrid, control_star[:, 1], kind="cubic", bounds_error=Fals
 
 
 ''' SIMULATIONS '''
-k = np.array([k_ss*dev, k_ss*dev])
+k = np.array([k_ss*(1+dev), k_ss*(1+dev)])
 grid_sim={}
 rl_sim={}
 grid_v = 0
@@ -134,6 +137,8 @@ plt.plot(k_grid, color='blue', label='k_grid')
 plt.plot(k_rl, color='red', label='k_rl')
 plt.axhline(k_ss, color="green", label='k_ss')
 plt.title("k")
+if zoom == "out":
+    plt.ylim(k_ss*(1-zoom_factor), k_ss*(1+zoom_factor))
 plt.legend()
 plt.show()
 
@@ -144,6 +149,8 @@ plt.plot(c_grid, color='blue', label='c_grid')
 plt.plot(c_rl, color='red', label='c_rl')
 plt.axhline(c_ss, color="green", label='c_ss')
 plt.title("c")
+if zoom == "out":
+    plt.ylim(c_ss*(1-zoom_factor), c_ss*(1+zoom_factor))
 plt.legend()
 plt.show()
 
@@ -154,6 +161,8 @@ plt.plot(n_grid, color='blue', label='n_grid')
 plt.plot(n_rl, color='red', label='n_rl')
 plt.axhline(n_ss, color="green", label='n_ss')
 plt.title("n")
+if zoom == "out":
+    plt.ylim(n_ss*(1-zoom_factor), n_ss*(1+zoom_factor))
 plt.legend()
 plt.show()
 
