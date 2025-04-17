@@ -98,3 +98,4 @@ class steady:
 
 ss = steady()
 c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+    

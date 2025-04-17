@@ -38,7 +38,7 @@ class Model(gym.Env):
         if options=="steady":
             self.state[1] = self.k0
         else:
-            self.state[1] = np.random.uniform(low=self.k0-self.var_k, high=self.k0+self.var_k) 
+            self.state[1] = np.random.uniform(low=self.k0*(1-self.var_k), high=self.k0*(1+self.var_k)) 
 
         obs = np.array(self.state, dtype=np.float32)
         return obs, {'y': 0}

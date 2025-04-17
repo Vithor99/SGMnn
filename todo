@@ -1,7 +1,7 @@
 
 1) convergenza migliore (piu stabile e piu utility)
 
-    a1) model selection during testing: test model on the same set of k0 and select highest utility 
+    a1) salvare value network..
 
     b) salva stati
     c) target network

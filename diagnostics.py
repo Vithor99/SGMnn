@@ -12,13 +12,15 @@ from steady import steady
 from scipy.interpolate import interp1d
 
 '''CONTROLS'''
-T = 500
-dev = 0.05
+T = 1000
+dev = 0 #Pct initial deviation from steady state
 
-zoom = "in" # in or out 
-zoom_factor = 0.1 # if zoom == "out" this is the factor of zooming in the plot
-rl_model = 'saved_models/RBC_steady_deterministic.pt'
+zoom = "out" # in or out 
+zoom_factor = 5 # if zoom == "out": pct band around ss that we want to visualize
+additional_analysis = "no" # if yes it runs some other stuff 
+rl_model = 'saved_models/RBC_random_deterministic_T=550.pt'
 grid_model = 'grid_data_dev10pct.pkl'
+
 
 '''LOADING MODELS'''
 # Loading model steady state
@@ -94,7 +96,7 @@ optimal_n  = interp1d(kgrid, control_star[:, 1], kind="cubic", bounds_error=Fals
 
 
 ''' SIMULATIONS '''
-k = np.array([k_ss*(1+dev), k_ss*(1+dev)])
+k = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
 grid_sim={}
 rl_sim={}
 grid_v = 0
@@ -138,7 +140,7 @@ plt.plot(k_rl, color='red', label='k_rl')
 plt.axhline(k_ss, color="green", label='k_ss')
 plt.title("k")
 if zoom == "out":
-    plt.ylim(k_ss*(1-zoom_factor), k_ss*(1+zoom_factor))
+    plt.ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
 plt.legend()
 plt.show()
 
@@ -150,7 +152,7 @@ plt.plot(c_rl, color='red', label='c_rl')
 plt.axhline(c_ss, color="green", label='c_ss')
 plt.title("c")
 if zoom == "out":
-    plt.ylim(c_ss*(1-zoom_factor), c_ss*(1+zoom_factor))
+    plt.ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
 plt.legend()
 plt.show()
 
@@ -162,19 +164,59 @@ plt.plot(n_rl, color='red', label='n_rl')
 plt.axhline(n_ss, color="green", label='n_ss')
 plt.title("n")
 if zoom == "out":
-    plt.ylim(n_ss*(1-zoom_factor), n_ss*(1+zoom_factor))
+    plt.ylim(n_ss*(1-(zoom_factor/100)), n_ss*(1+(zoom_factor/100)))
 plt.legend()
 plt.show()
 
 print(f"Steady state value = {vss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
-print(f"Pct distance of RL to grid:{(rl_v - grid_v)*100/(grid_v)}") # if negative v_rl > v_grid
+print(f"Pct welfare gain of RL to grid:{-(rl_v - grid_v)*100/(grid_v)}") # if positive v_rl > v_grid
 
+if additional_analysis == 1:
+    ''' VALUE CONVERGENCE'''
+    #I used this to see how many training periods it takes for the value to converge to its long-run
+    ss = steady()
+    T=1000000
+    pct_eps = 0.4#0.4 # pct distance from long run value 
+    v_list = np.zeros(T)
+    v_target = ss.ss_value(T)
+    #v_change = np.zeros(1000-1)
+    for i in range(T):
+        T_train = i
+        v_t = ss.ss_value(T_train)
+        if i>0: 
+            v_dist =  ((v_t - v_target)/np.abs(v_target))*100
+            if v_dist < pct_eps: 
+                delt = v_target / v_t
+                print(f"Value converged at T={i}")
+                break
 
+        v_list[i] = v_t
 
+    # Here Im interested in looking for the delt values (eg c* = c_ss * delt_c) that makes the distance from the steady state equal to 0.4%
+    # i.e, give a distance from the long-run value, what distance can we expect from the steady state variables? 
+    #Probably this analysis does not make sense but I will keep it for now
+    nbl = 100
+    delt_t = ss.gamma*np.log(c_ss) * ((1-delt)/delt) + ss.psi*np.log(1-n_ss) * ((1-delt)/delt) 
+    DeltL = np.linspace(0.995, 1.005, nbl)
+    DeltC = []
+    for i in range(nbl):
+        delt_c = np.exp((1/ss.gamma)*(delt_t - ss.psi*np.log(DeltL[i])))
+        DeltC.append(delt_c)
 
+    #Now we want to see in our RL model where we are on the curve of DeltL vs DeltC
+    # first we compute the 'steady state' values of the RL model
+    n=20 #last n periods of the rl simulation to compute the steady state
+    l_rl_ss = 1 - np.sum(n_rl[-n:])/n 
+    c_rl_ss = np.sum(c_rl[-n:])/n
 
+    delt_c = c_ss / c_rl_ss
+    delt_l = (1-n_ss) / l_rl_ss
 
-
+    plt.plot(DeltL, DeltC)
+    plt.scatter(delt_l, delt_c, color='red')
+    plt.scatter(1, 1, color='green')
+    plt.title("DeltL vs DeltC") 
+    plt.show() 
 
 ''' version for deterministic model'''
 '''

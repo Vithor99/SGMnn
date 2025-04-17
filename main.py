@@ -16,15 +16,16 @@ from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
 #deterministic runs version without shocks, None runs stochastic 
-version = "stochastic" # deterministic ; stochastic 
+version = "deterministic" # deterministic ; stochastic 
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
 initial_k = "random" # steady ; random 
-var_k0 = 0.1         #deviation from ss capital
+var_k0 = 1           #Pct deviation from ss capital
 
-T_test = 500
-T_train = 500 
+T_test = 550
+T_train = 550
 frq_test = 500 
+EPOCHS = 40000
 
 
 '''SETTING PARAMETERS''' 
@@ -35,7 +36,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-3.5, type=float)
+parser.add_argument('--policy_var', default=-3.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -55,20 +56,19 @@ torch.cuda.manual_seed(seed)
 
 # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu')
-
 name_exp = ''
 #string to indicate type in logs
-model_type = initial_k + "_" + version
-sim_length = "train="+ str(T_train) + "_" + "test="+ str(T_test) + "_"
-
+model_type = initial_k + "_" + version 
+sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
         name_exp += str(k) + "=" + str(v) + "_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
-
 name_exp += str(model_type)
+if initial_k == "random":
+    name_exp += "_var="+str(var_k0)
 name_exp += str(sim_length)
 writer = SummaryWriter("logs/"+ name_exp)
 
@@ -112,7 +112,7 @@ register(
     id="model",
     entry_point="simulation:Model",
     kwargs={'k': k_ss,
-            'var_k': var_k0*k_ss,
+            'var_k': var_k0/100,
             'gamma': ss.gamma,
             'psi': ss.psi,
             'delta': ss.delta,
@@ -137,12 +137,11 @@ sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 '''
 Start Training the model 
 '''
-EPOCHS = 40000
 vss_train = ss.ss_value(T_train)
 frq_train = 3
 
 vss_test = ss.ss_value(T_test)
-n_eval = 5 #0
+n_eval = 5
 best_utility = -np.inf
 
 for iter in tqdm(range(EPOCHS)):
@@ -167,7 +166,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("train utility", ((vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
+    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -192,7 +191,7 @@ for iter in tqdm(range(EPOCHS)):
         last_state = 0
         last_cons = 0 
         last_lab =  0
-        #random_util = 0
+        random_util = 0
 
         for _ in range(n_eval):
             last_sim = {}
@@ -265,7 +264,7 @@ for iter in tqdm(range(EPOCHS)):
 
         writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
         writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap*100, iter)
-        writer.add_scalar("pct welfare gain of steady state to current policy", (-(vss_test-total_utility)/total_utility)*100 , iter)
+        writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-(vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", (-(total_utility-random_util)/random_util)*100 , iter) 
         writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
         writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
