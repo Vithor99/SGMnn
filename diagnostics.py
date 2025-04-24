@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 import pickle
@@ -12,21 +13,31 @@ from steady import steady
 from scipy.interpolate import interp1d
 
 '''CONTROLS'''
-T = 1000
-dev = 0 #Pct initial deviation from steady state
-
-zoom = "out" # in or out 
-zoom_factor = 5 # if zoom == "out": pct band around ss that we want to visualize
-additional_analysis = "no" # if yes it runs some other stuff 
-rl_model = 'saved_models/RBC_random_deterministic_T=550.pt'
+rl_model = 'RBC_random_deterministic_T=550.pt' 
 grid_model = 'grid_data_dev10pct.pkl'
+
+run_simulation = "no" #if yes it runs the simulation
+if run_simulation == "yes":
+    T = 500
+    dev = 5 #Pct initial deviation from steady state
+    zoom = "in" # in or out: if out zoom factor is activated 
+    zoom_factor = 10 # if zoom == "out": pct band around ss that we want to visualize
+
+
+run_policy = "yes" # if yes it runs the policy evaluation
+if run_policy == "yes":
+    dev = 5
+    N = 500
+
+    
+
+run_add_analysis = "no" # if yes it runs some other stuff 
 
 
 '''LOADING MODELS'''
 # Loading model steady state
 ss = steady()
 c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
-vss = ss.ss_value(T)
 
 # Loading RL policy
 parser = argparse.ArgumentParser()
@@ -77,101 +88,218 @@ agent = ActorCritic(input_dim=state_dim,
                     learn_std=args.learn_std==1,
                     device=device).to(device)
 
-agent.load_state_dict(torch.load(rl_model, map_location=device))
+rl_model_path = 'saved_models/' + rl_model
+agent.load_state_dict(torch.load(rl_model_path, map_location=device))
 agent.eval()
 
 
 # Loading Grid (vi) policy
-with open(grid_model, 'rb') as f:
+grid_model_path = 'saved_models/' + grid_model
+with open(grid_model_path, 'rb') as f:
     loaded_data = pickle.load(f)
 
 kgrid = loaded_data['kgrid']
 kp_star = loaded_data['kp_star']
 control_star = loaded_data['control_star']
-optimal_kp = interp1d(kgrid, kp_star, kind="cubic", bounds_error=False, fill_value=0)
-optimal_c  = interp1d(kgrid, control_star[:, 0], kind="cubic", bounds_error=False, fill_value=0)
-optimal_n  = interp1d(kgrid, control_star[:, 1], kind="cubic", bounds_error=False, fill_value=0)
+optimal_kp = interp1d(kgrid, kp_star, kind="slinear", bounds_error=False, fill_value=0)
+optimal_c  = interp1d(kgrid, control_star[:, 0], kind="slinear", bounds_error=False, fill_value=0)
+optimal_n  = interp1d(kgrid, control_star[:, 1], kind="slinear", bounds_error=False, fill_value=0)
 
 
 
 
-''' SIMULATIONS '''
-k = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
-grid_sim={}
-rl_sim={}
-grid_v = 0
-rl_v = 0
+''' SIMULATION '''
+if run_simulation == "yes":
+    k = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    grid_sim={}
+    rl_sim={}
+    grid_v = 0
+    rl_v = 0
 
-for t in range(T):
-    #RL 
-    st = np.array([1, k[0]])
-    state = torch.from_numpy(st).float().to(device)
-    with torch.no_grad():
-        action_tensor, _ = agent.get_action(state, test=True)
-        action_rl = action_tensor.squeeze().numpy()
-    st1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
-    u_rl = ss.gamma*np.log(action_rl[0]) + ss.psi*np.log(1-action_rl[1])
-    rl_v += ss.beta**t * u_rl
-    rl_sim[t] = {'st': st,
-                   'a': action_rl,
-                   'u': u_rl,
-                   'st1': st1_rl}
+    for t in range(T):
+        #RL 
+        st = np.array([1, k[0]])
+        state = torch.from_numpy(st).float().to(device)
+        with torch.no_grad():
+            action_tensor, _ = agent.get_action(state, test=True)
+            action_rl = action_tensor.squeeze().numpy()
+        st1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+        u_rl = ss.gamma*np.log(action_rl[0]) + ss.psi*np.log(1-action_rl[1])
+        rl_v += ss.beta**t * u_rl
+        rl_sim[t] = {'st': st,
+                    'a': action_rl,
+                    'u': u_rl,
+                    'st1': st1_rl}
+        
+        #Grid 
+        a = np.array([optimal_c(k[1]), optimal_n(k[1])])
+        u = ss.gamma*np.log(a[0]) + ss.psi*np.log(1-a[1])
+        grid_v += ss.beta**t * u
+        kp_grid = optimal_kp(k[1])
+        grid_sim[t] = {'st': k[1],
+                    'a': a,
+                    'u': u,
+                    'st1': kp_grid}
+
+        k = np.array([st1_rl, kp_grid])
+
+    #Plotting
+    #capital
+    k_grid = [entry['st'] for entry in grid_sim.values()]
+    k_rl = [entry['st'][1] for entry in rl_sim.values()]
     
-    #grid 
-    a = np.array([optimal_c(k[1]), optimal_n(k[1])])
-    u = ss.gamma*np.log(a[0]) + ss.psi*np.log(1-a[1])
-    grid_v += ss.beta**t * u
-    kp_grid = optimal_kp(k[1])
-    grid_sim[t] = {'st': k[1],
-                   'a': a,
-                   'u': u,
-                   'st1': kp_grid}
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(k_grid, color='blue', linewidth=1.5, label='Grid')
+    ax.plot(k_rl, color='crimson', linewidth=1.5, label='RL')
+    ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--',label='Steady State')
+    ax.set_title("Capital", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$k_t$', fontstyle='italic')
+    if zoom == "out":
+        ax.set_ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
 
-    k = np.array([st1_rl, kp_grid])
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_capital.png')
+    fig.savefig(plot_path)
+
+    #consumption
+    c_grid = [entry['a'][0] for entry in grid_sim.values()]
+    c_rl = [entry['a'][0] for entry in rl_sim.values()]
+
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(c_grid, color='blue', linewidth=1.5, label='Grid')
+    ax.plot(c_rl, color='crimson', linewidth=1.5, label='RL')
+    ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.set_title("Consumption", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$c_t$', fontstyle='italic')
+    if zoom == "out":
+        ax.set_ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_consumption.png')
+    fig.savefig(plot_path)
+
+    #labour
+    n_grid = [entry['a'][1] for entry in grid_sim.values()]
+    n_rl = [entry['a'][1] for entry in rl_sim.values()]
+
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(n_grid, color='blue', linewidth=1.5, label='Grid')
+    ax.plot(n_rl, color='crimson', linewidth=1.5, label='RL')
+    ax.axhline(n_ss, color="black", linewidth=1.2, linestyle = '--', label='Steady State')
+    ax.set_title("Labour", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$n_t$', fontstyle='italic')
+    if zoom == "out":
+        ax.set_ylim(n_ss*(1-(zoom_factor/100)), n_ss*(1+(zoom_factor/100)))
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_labour.png')
+    fig.savefig(plot_path)
+
+    vss = ss.ss_value(T)
+    print(f"Steady state value = {vss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
+    print(f"Pct welfare gain of RL to grid:{-(rl_v - grid_v)*100/(grid_v)}") # if positive v_rl > v_grid
 
 
 
-#Plotting
-k_grid = [entry['st'] for entry in grid_sim.values()]
-k_rl = [entry['st'][1] for entry in rl_sim.values()]
 
-plt.plot(k_grid, color='blue', label='k_grid')
-plt.plot(k_rl, color='red', label='k_rl')
-plt.axhline(k_ss, color="green", label='k_ss')
-plt.title("k")
-if zoom == "out":
-    plt.ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
-plt.legend()
-plt.show()
+''' POLICY EVALUATION '''
+if run_policy == "yes":
+    c_values = np.zeros((N, 2))
+    n_values = np.zeros((N, 2))
+    k1_values = np.zeros((N, 2))
+    k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
+    for i in range(len(k_values)):
+        #RL 
+        st = np.array([1, k_values[i]])
+        state = torch.from_numpy(st).float().to(device)
+        with torch.no_grad():
+            action_tensor, _ = agent.get_action(state, test=True)
+            action_rl = action_tensor.squeeze().numpy()
+        c_rl = action_rl[0]
+        n_rl = action_rl[1]
+        k1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+        #Grid 
+        c_grid = optimal_c(k_values[i])
+        n_grid = optimal_n(k_values[i])
+        k1_grid = optimal_kp(k_values[i])
+        #save 
+        c_values[i] = [c_rl, c_grid]
+        n_values[i] = [n_rl, n_grid]
+        k1_values[i] = [k1_rl, k1_grid]
+    #plotting
+    #consumption
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, c_values[:, 0], color='crimson', linewidth=1.5, label='RL')
+    ax.plot(k_values, c_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.set_title("Consumption Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$c_t$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
 
-c_grid = [entry['a'][0] for entry in grid_sim.values()]
-c_rl = [entry['a'][0] for entry in rl_sim.values()]
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_cons_rule.png')
+    fig.savefig(plot_path)
 
-plt.plot(c_grid, color='blue', label='c_grid')
-plt.plot(c_rl, color='red', label='c_rl')
-plt.axhline(c_ss, color="green", label='c_ss')
-plt.title("c")
-if zoom == "out":
-    plt.ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
-plt.legend()
-plt.show()
+    #labour
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, n_values[:, 0], color='crimson', linewidth=1.5, label='RL')
+    ax.plot(k_values, n_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.set_title("Labour Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$n_t$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
 
-n_grid = [entry['a'][1] for entry in grid_sim.values()]
-n_rl = [entry['a'][1] for entry in rl_sim.values()]
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_lab_rule.png')
+    fig.savefig(plot_path)
 
-plt.plot(n_grid, color='blue', label='n_grid')
-plt.plot(n_rl, color='red', label='n_rl')
-plt.axhline(n_ss, color="green", label='n_ss')
-plt.title("n")
-if zoom == "out":
-    plt.ylim(n_ss*(1-(zoom_factor/100)), n_ss*(1+(zoom_factor/100)))
-plt.legend()
-plt.show()
+    #capital
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, k1_values[:, 0], color='crimson', linewidth=1.5, label='RL')
+    ax.plot(k_values, k1_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.set_title("Saving Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$k_{t+1}$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
 
-print(f"Steady state value = {vss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
-print(f"Pct welfare gain of RL to grid:{-(rl_v - grid_v)*100/(grid_v)}") # if positive v_rl > v_grid
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_saving_rule.png')
+    fig.savefig(plot_path)
 
-if additional_analysis == 1:
+
+
+'''ADD ANALYSIS'''
+if run_add_analysis == 1:
     ''' VALUE CONVERGENCE'''
     #I used this to see how many training periods it takes for the value to converge to its long-run
     ss = steady()

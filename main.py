@@ -16,16 +16,16 @@ from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
 #deterministic runs version without shocks, None runs stochastic 
-version = "deterministic" # deterministic ; stochastic 
+version = "stochastic" # deterministic ; stochastic 
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
 initial_k = "random" # steady ; random 
-var_k0 = 1           #Pct deviation from ss capital
+var_k0 = 15           #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
 frq_test = 500 
-EPOCHS = 40000
+EPOCHS = 60000
 
 
 '''SETTING PARAMETERS''' 
