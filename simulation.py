@@ -7,7 +7,7 @@ import warnings
 
 class Model(gym.Env):
 
-    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
+    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None, opt_consumption=None):
         super().__init__()
 
         self.observation_space = spaces.Box(
@@ -29,13 +29,14 @@ class Model(gym.Env):
         self.var_k = var_k
         self.noise = noise
         self.version = version
+        self.opt_consumption = opt_consumption
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.time = 0
         self.state[0] = 1
 
-        if options=="steady":
+        if options == "steady":
             self.state[1] = self.k0
         else:
             self.state[1] = np.random.uniform(low=self.k0*(1-self.var_k), high=self.k0*(1+self.var_k)) 
@@ -49,11 +50,15 @@ class Model(gym.Env):
         #rescale magnitueds coming from NN
         z = self.state[0]
         k = self.state[1]
-        c = action[0]
-        n = action[1]
+        if action.ndim == 0:
+            n = action
+            c = self.opt_consumption(k, z, n)
+        else:
+            c = action[0]
+            n = action[1]
 
         #compute Penalty / reward
-        y = z* (k**self.alpha) * (n**(1-self.alpha))
+        y = z * (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
 
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
@@ -79,7 +84,7 @@ class Model(gym.Env):
         if self.time >= self.T:
             done = True
 
-        return new_state, U, done, False, {'y': y}
+        return new_state, U, done, False, {'y': y, 'c': c}
 
 
 

@@ -14,13 +14,17 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
+import time
+
 '''CONTROLS'''
 #deterministic runs version without shocks, None runs stochastic 
-version = "stochastic" # deterministic ; stochastic 
+version = "deterministic" # deterministic ; stochastic
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
-initial_k = "random" # steady ; random 
+initial_k = "steady" # steady ; random
 var_k0 = 15           #Pct deviation from ss capital
+
+learn_consumption = False
 
 T_test = 550
 T_train = 550
@@ -36,7 +40,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-3.0, type=float)
+parser.add_argument('--policy_var', default=-1.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -56,6 +60,7 @@ torch.cuda.manual_seed(seed)
 
 # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu')
+
 name_exp = ''
 #string to indicate type in logs
 model_type = initial_k + "_" + version 
@@ -70,22 +75,27 @@ name_exp += str(model_type)
 if initial_k == "random":
     name_exp += "_var="+str(var_k0)
 name_exp += str(sim_length)
-writer = SummaryWriter("logs/"+ name_exp)
+writer = SummaryWriter("logs/" + name_exp + "_no_done")
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
 state_dim = ss.states
-action_dim = ss.actions
+action_dim = ss.actions if learn_consumption else ss.actions-1
 alpha = ss.alpha
 
-action_bounds = {
-    'order': [1, 0],
-    ''
-    'min': [lambda: 0,
-            lambda: 0],
-    'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
-            lambda s0, s1, alpha, a1: 1.0]
-    }
+if learn_consumption:
+    action_bounds = {
+        'order': [1, 0],
+        'min': [lambda: 0,
+                lambda: 0],
+        'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
+                lambda s0, s1, alpha, a1: 1.0]
+        }
+else:
+    action_bounds = {
+        'min': [lambda s0 : (s0*(ss.gamma/ss.psi)*(1-ss.alpha))/(1+(s0*(ss.gamma/ss.psi)*(1-ss.alpha)))],
+        'max': [lambda : 1.0]
+        }
 
 
 ''' Define Model'''
@@ -104,7 +114,8 @@ agent = ActorCritic(input_dim=state_dim,
                     epsilon=args.epsilon_greedy,
                     batch_size=args.batch_size,
                     alpha=alpha,
-                    learn_std=args.learn_std==1,
+                    learn_std=args.learn_std == 1,
+                    learn_consumption=learn_consumption,
                     device=device).to(device)
 
 
@@ -120,7 +131,8 @@ register(
             'alpha': ss.alpha,
             'T': 1000,        #we can remove no? 
             'noise': ss.var_eps_z,
-            'version': version},
+            'version': version,
+            'opt_consumption': ss.get_consumption},
 )
 
 def make_env():
@@ -153,7 +165,11 @@ for iter in tqdm(range(EPOCHS)):
         st_tensor = torch.from_numpy(st).float().to(device)
         with torch.no_grad():
             action_tensor, log_prob = agent.get_action(st_tensor)
-            a = action_tensor.numpy()
+
+            # action_tensor = torch.tensor([[c_ss, n_ss]]*4)
+            # log_prob = torch.tensor([1.0]*4)
+
+            a = action_tensor.cpu().numpy()
             st1, u, done, _, y = sims.step(a)
             #u_debug = ss.gamma*np.log(a[0]) + ss.psi * np.log(1-a[1])
 
@@ -166,7 +182,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
+    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -189,8 +205,8 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap = 0
         labor_gap = 0
         last_state = 0
-        last_cons = 0 
-        last_lab =  0
+        last_cons = 0
+        last_lab = 0
         random_util = 0
 
         for _ in range(n_eval):
@@ -206,11 +222,13 @@ for iter in tqdm(range(EPOCHS)):
                 with torch.no_grad():
                     action_tensor, log_prob = agent.get_action(st_tensor, test=True)
                     a = action_tensor.squeeze().numpy()
-                    st1, u, done, _, y = test_sim.step(a)
-                    y = y['y']
+                    st1, u, done, _, yc = test_sim.step(a)
+                    y = yc['y']
+                    c = yc['c']
 
                     last_sim[t] = {'st': st,
                                    'a': a,
+                                   'c': c,
                                    'u': u,
                                    'st1': st1,
                                    'y': y}
@@ -230,8 +248,8 @@ for iter in tqdm(range(EPOCHS)):
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-                        c0 = all_actions[t-1,0]
-                        c1 = all_actions[t,0]
+                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]
+                        c1 = last_sim[t]['c'] #all_actions[t,0]
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
                         c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
@@ -270,7 +288,8 @@ for iter in tqdm(range(EPOCHS)):
         writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
         writer.add_scalar("pct distance of n to n_ss", (np.abs(last_lab - n_ss)/n_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
-        writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
+        if all_actions.shape[-1] > 1:
+            writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
 
   
         if best_utility < total_utility:

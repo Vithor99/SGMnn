@@ -12,7 +12,7 @@ from model_architectures import ValueNetwork, StochasticPolicyNetwork
 
 class ActorCritic(nn.Module):
 
-    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
+    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_consumption=True, learn_std=True, device=None):
         super(ActorCritic, self).__init__()
 
         self.epsilon = epsilon
@@ -24,7 +24,7 @@ class ActorCritic(nn.Module):
 
         # self.replay_buffer = Memory(2000)
         self.value_net = ValueNetwork(input_dim, architecture_params, 1)
-        self.policy_net = StochasticPolicyNetwork(input_dim, architecture_params, output_dim, alpha=alpha, learn_std=learn_std)
+        self.policy_net = StochasticPolicyNetwork(input_dim, architecture_params, output_dim, alpha=alpha, learn_std=learn_std, learn_consumption=learn_consumption)
 
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
@@ -36,8 +36,8 @@ class ActorCritic(nn.Module):
 
     def get_action(self, st, test=False):
         a = self.policy_net.get_action(st, test=test)
-        if np.random.rand() < self.epsilon and not test:
-            a = torch.rand((st.shape[0], 2))*0.15
+        # if np.random.rand() < self.epsilon and not test:
+        #     a = torch.rand((st.shape[0], 2))*0.15
         return a
 
     def update(self):

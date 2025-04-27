@@ -27,7 +27,7 @@ class ValueNetwork(nn.Module):
 
 class StochasticPolicyNetwork(nn.Module):
 
-    def __init__(self, state_dim, architecture_params, action_dim, alpha=0, learn_std=True):
+    def __init__(self, state_dim, architecture_params, action_dim, alpha=0, learn_std=True, learn_consumption=True):
         super(StochasticPolicyNetwork, self).__init__()
 
         self.var_scale = architecture_params['policy_var']
@@ -35,6 +35,8 @@ class StochasticPolicyNetwork(nn.Module):
         self.action_bounds = architecture_params['action_bounds']
         self.use_hard_bounds = architecture_params['use_hard_bounds']
         self.alpha = alpha
+
+        self.learn_consumption = learn_consumption
 
         layers = [nn.Linear(state_dim, architecture_params['n_neurons']), nn.ReLU()]
         for _ in range(architecture_params['n_layers']):
@@ -79,6 +81,23 @@ class StochasticPolicyNetwork(nn.Module):
         state = state.view(1, -1) if state.dim() == 1 else state
 
         mean, std = self.forward(state)
+
+        if not self.learn_consumption:
+
+            lower_bound = torch.ones_like(mean[:, 0]) * self.action_bounds['min'][0](state[:, 0])
+            upper_bound = torch.ones_like(mean[:, 0])
+
+            base_dist = D.Normal(mean[:, 0], std[:, 0])
+            sigmoid_transform = T.SigmoidTransform()
+            affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+            transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+            dist_1 = D.TransformedDistribution(base_dist, transform)
+            action_1 = dist_1.sample() if not test else dist_1.sample([1000]).mean(0)
+
+            log_prob = dist_1.log_prob(action_1)
+            log_prob = log_prob.sum(-1) if log_prob.dim() > 1 else log_prob
+
+            return action_1, log_prob
 
         lower_bound = torch.zeros_like(mean[:, 1])
         upper_bound = torch.ones_like(mean[:, 1]) * self.action_bounds['max'][1](None, None, None, None)
@@ -137,6 +156,22 @@ class StochasticPolicyNetwork(nn.Module):
         state = state.view(1, -1) if state.dim() == 1 else state
 
         mean, std = self.forward(state)
+
+        if not self.learn_consumption:
+
+            lower_bound = torch.ones_like(mean[:, 0]) * self.action_bounds['min'][0](state[:, 0])
+            upper_bound = torch.ones_like(mean[:, 0])
+
+            base_dist = D.Normal(mean[:, 0], std[:, 0])
+            sigmoid_transform = T.SigmoidTransform()
+            affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+            transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+            dist_1 = D.TransformedDistribution(base_dist, transform)
+
+            log_prob = dist_1.log_prob(action)
+            log_prob = log_prob.sum(-1) if log_prob.dim() > 1 else log_prob
+
+            return log_prob
 
         lower_bound = torch.zeros_like(mean[:, 1])
         upper_bound = torch.ones_like(mean[:, 1]) * self.action_bounds['max'][1](None, None, None, None)
