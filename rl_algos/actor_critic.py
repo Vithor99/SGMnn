@@ -29,6 +29,10 @@ class ActorCritic(nn.Module):
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
+    
+    def get_value(self, st):
+        v = self.value_net(st).squeeze()
+        return v
 
     def get_action(self, st, test=False):
         a = self.policy_net.get_action(st, test=test)

@@ -14,7 +14,7 @@ from scipy.interpolate import interp1d
 
 '''CONTROLS'''
 rl_model = 'RBC_random_deterministic_T=550.pt' 
-grid_model = 'grid_data_dev10pct.pkl'
+grid_model = 'Grid_data_dev10pct.pkl'
 
 run_simulation = "no" #if yes it runs the simulation
 if run_simulation == "yes":
@@ -22,14 +22,13 @@ if run_simulation == "yes":
     dev = 5 #Pct initial deviation from steady state
     zoom = "in" # in or out: if out zoom factor is activated 
     zoom_factor = 10 # if zoom == "out": pct band around ss that we want to visualize
-
-
+    run_foc = "yes" # if yes it runs the focs of the model
+        
 run_policy = "yes" # if yes it runs the policy evaluation
 if run_policy == "yes":
     dev = 5
     N = 500
 
-    
 
 run_add_analysis = "no" # if yes it runs some other stuff 
 
@@ -38,6 +37,7 @@ run_add_analysis = "no" # if yes it runs some other stuff
 # Loading model steady state
 ss = steady()
 c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+v_ss = ss.ss_value(1000)
 
 # Loading RL policy
 parser = argparse.ArgumentParser()
@@ -101,9 +101,12 @@ with open(grid_model_path, 'rb') as f:
 kgrid = loaded_data['kgrid']
 kp_star = loaded_data['kp_star']
 control_star = loaded_data['control_star']
+v_star = loaded_data['value_star']
 optimal_kp = interp1d(kgrid, kp_star, kind="slinear", bounds_error=False, fill_value=0)
-optimal_c  = interp1d(kgrid, control_star[:, 0], kind="slinear", bounds_error=False, fill_value=0)
-optimal_n  = interp1d(kgrid, control_star[:, 1], kind="slinear", bounds_error=False, fill_value=0)
+#optimal_c  = interp1d(kgrid, control_star[:, 0], kind="slinear", bounds_error=False, fill_value=0)
+optimal_n  = interp1d(kgrid, control_star, kind="slinear", bounds_error=False, fill_value=0)
+optimal_v = interp1d(kgrid, v_star, kind="slinear", bounds_error=False, fill_value=0)
+
 
 
 
@@ -115,6 +118,9 @@ if run_simulation == "yes":
     rl_sim={}
     grid_v = 0
     rl_v = 0
+    labour_gap = np.zeros((T-1, 2))
+    euler_gap = np.zeros((T-1, 2))
+    
 
     for t in range(T):
         #RL 
@@ -130,22 +136,39 @@ if run_simulation == "yes":
                     'a': action_rl,
                     'u': u_rl,
                     'st1': st1_rl}
-        
+        if run_foc == "yes":
+            if t>0:
+                l_gap, e_gap = ss.foc_log(rl_sim[t-1]['a'][0], rl_sim[t]['a'][0], 
+                                        rl_sim[t-1]['a'][1], rl_sim[t]['a'][1], 
+                                        rl_sim[t-1]['st'][0], 
+                                        rl_sim[t-1]['st'][1], rl_sim[t]['st'][1])
+                labour_gap[t-1,0] = l_gap
+                euler_gap[t-1,0] = e_gap
+
         #Grid 
-        a = np.array([optimal_c(k[1]), optimal_n(k[1])])
+        #a = np.array([optimal_c(k[1]), optimal_n(k[1])])
+        a = np.array([ss.get_consumption(k[1], 1, optimal_n(k[1])), optimal_n(k[1])])
         u = ss.gamma*np.log(a[0]) + ss.psi*np.log(1-a[1])
         grid_v += ss.beta**t * u
         kp_grid = optimal_kp(k[1])
-        grid_sim[t] = {'st': k[1],
+        grid_sim[t] = {'st': np.array([1, k[1]]),
                     'a': a,
                     'u': u,
                     'st1': kp_grid}
+        if run_foc == "yes":
+            if t>0:
+                l_gap, e_gap = ss.foc_log(grid_sim[t-1]['a'][0], grid_sim[t]['a'][0], 
+                                        grid_sim[t-1]['a'][1], grid_sim[t]['a'][1], 
+                                        grid_sim[t-1]['st'][0], 
+                                        grid_sim[t-1]['st'][1], grid_sim[t]['st'][1])
+                labour_gap[t-1, 1] = l_gap
+                euler_gap[t-1, 1] = e_gap
 
         k = np.array([st1_rl, kp_grid])
 
     #Plotting
     #capital
-    k_grid = [entry['st'] for entry in grid_sim.values()]
+    k_grid = [entry['st'][1] for entry in grid_sim.values()]
     k_rl = [entry['st'][1] for entry in rl_sim.values()]
     
     fig, ax = plt.subplots(figsize=(5, 6))  
@@ -213,6 +236,62 @@ if run_simulation == "yes":
     plot_path = 'plots/' + rl_model.replace('.pt', '_labour.png')
     fig.savefig(plot_path)
 
+    if run_foc == "yes":
+        #labour supply foc
+        fig, ax = plt.subplots(figsize=(5, 6))  
+        ax.plot(labour_gap[:, 0], color='#F08080', linewidth=1.0, alpha = 0.35,  label='RL')
+        ax.plot(labour_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
+
+        # Smooth labour_gap[:, 0] with exponential smoothing
+        alpha = 0.2  # Smoothing parameter
+        smoothed_labour_gap = np.zeros_like(labour_gap[:, 0])
+        smoothed_labour_gap[0] = labour_gap[0, 0]
+        for i in range(1, len(labour_gap[:, 0])):
+            smoothed_labour_gap[i] = alpha * labour_gap[i, 0] + (1 - alpha) * smoothed_labour_gap[i - 1]
+        
+        ax.plot(smoothed_labour_gap, color='crimson', linewidth=1.5, label='Smoothed RL')
+
+        ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
+        ax.set_title("Distance from Labour Supply", fontsize=16)
+        ax.set_xlabel("Periods", fontstyle='italic')         
+        ax.set_ylabel(r'$\% \Delta \ \ c_t$', fontstyle='italic')
+        ax.legend()          
+        ax.grid(axis='both', alpha=0.5)                         
+        ax.tick_params(axis='x', direction='in')
+        ax.tick_params(axis='y', direction='in')
+
+        fig.autofmt_xdate() 
+        plt.tight_layout()
+        plot_path = 'plots/' + rl_model.replace('.pt', '_lab_supply_foc.png')
+        fig.savefig(plot_path)
+
+        #euler foc
+        fig, ax = plt.subplots(figsize=(5, 6))  
+        ax.plot(euler_gap[:, 0], color='#F08080', linewidth=1.0, alpha = 0.35,  label='RL')
+        ax.plot(euler_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
+
+        alpha = 0.1  # Smoothing parameter
+        smoothed_euler_gap = np.zeros_like(euler_gap[:, 0])
+        smoothed_euler_gap[0] = euler_gap[0, 0]
+        for i in range(1, len(euler_gap[:, 0])):
+            smoothed_euler_gap[i] = alpha * euler_gap[i, 0] + (1 - alpha) * smoothed_euler_gap[i - 1]
+        
+        ax.plot(smoothed_euler_gap, color='crimson', linewidth=1.5, label='Smoothed RL')
+
+        ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
+        ax.set_title("Distance from Euler", fontsize=16)
+        ax.set_xlabel("Periods", fontstyle='italic')         
+        ax.set_ylabel(r'$\% \Delta \ \ \frac{c_{t+1}}{c_t}$', fontstyle='italic')
+        ax.legend()          
+        ax.grid(axis='both', alpha=0.5)                         
+        ax.tick_params(axis='x', direction='in')
+        ax.tick_params(axis='y', direction='in')
+
+        fig.autofmt_xdate() 
+        plt.tight_layout()
+        plot_path = 'plots/' + rl_model.replace('.pt', '_euler_foc.png')
+        fig.savefig(plot_path)
+
     vss = ss.ss_value(T)
     print(f"Steady state value = {vss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
     print(f"Pct welfare gain of RL to grid:{-(rl_v - grid_v)*100/(grid_v)}") # if positive v_rl > v_grid
@@ -225,6 +304,7 @@ if run_policy == "yes":
     c_values = np.zeros((N, 2))
     n_values = np.zeros((N, 2))
     k1_values = np.zeros((N, 2))
+    v_values = np.zeros((N, 2))
     k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
     for i in range(len(k_values)):
         #RL 
@@ -233,22 +313,30 @@ if run_policy == "yes":
         with torch.no_grad():
             action_tensor, _ = agent.get_action(state, test=True)
             action_rl = action_tensor.squeeze().numpy()
+            value_tensor = agent.get_value(state)
+            value_rl = value_tensor.numpy()
         c_rl = action_rl[0]
         n_rl = action_rl[1]
         k1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+        v_rl = float(value_rl)
         #Grid 
-        c_grid = optimal_c(k_values[i])
         n_grid = optimal_n(k_values[i])
+        c_grid = ss.get_consumption(k_values[i], 1, n_grid)
         k1_grid = optimal_kp(k_values[i])
+        v_grid = optimal_v(k_values[i])
         #save 
         c_values[i] = [c_rl, c_grid]
         n_values[i] = [n_rl, n_grid]
         k1_values[i] = [k1_rl, k1_grid]
+        v_values[i] = [v_rl, v_grid]
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
     ax.plot(k_values, c_values[:, 0], color='crimson', linewidth=1.5, label='RL')
     ax.plot(k_values, c_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, c_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(c_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
@@ -256,7 +344,7 @@ if run_policy == "yes":
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
-
+    
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = 'plots/' + rl_model.replace('.pt', '_cons_rule.png')
@@ -266,6 +354,9 @@ if run_policy == "yes":
     fig, ax = plt.subplots(figsize=(5, 6))
     ax.plot(k_values, n_values[:, 0], color='crimson', linewidth=1.5, label='RL')
     ax.plot(k_values, n_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, n_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(n_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Labour Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$n_t$', fontstyle='italic')
@@ -283,6 +374,9 @@ if run_policy == "yes":
     fig, ax = plt.subplots(figsize=(5, 6))
     ax.plot(k_values, k1_values[:, 0], color='crimson', linewidth=1.5, label='RL')
     ax.plot(k_values, k1_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, k_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Saving Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$k_{t+1}$', fontstyle='italic')
@@ -294,6 +388,26 @@ if run_policy == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = 'plots/' + rl_model.replace('.pt', '_saving_rule.png')
+    fig.savefig(plot_path)
+
+    #value function
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, v_values[:, 0], color='crimson', linewidth=1.5, label='RL')
+    ax.plot(k_values, v_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, v_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(v_ss, color='black', linestyle=':', linewidth=1)
+    ax.set_title("Value Function", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$V(k_t)$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_value_function.png')
     fig.savefig(plot_path)
 
 
@@ -345,75 +459,4 @@ if run_add_analysis == 1:
     plt.scatter(1, 1, color='green')
     plt.title("DeltL vs DeltC") 
     plt.show() 
-
-''' version for deterministic model'''
-'''
-#open last simulation and rescale variables
-with open("last_sim.pkl", "rb") as f:
-    data = pickle.load(f)
- 
-st = [entry['st'] for _, entry in data.items()]
-a = [entry['a'] for _, entry in data.items()]
-u = [entry['u'] for _, entry in data.items()]
-y = [entry['y'] for _, entry in data.items()]
-k = [pair[1] for pair in st]
-z = [pair[0] for pair in st]
-c = [pair[0] for pair in a]
-n = [pair[1] for pair in a]
-
-# distance from FOC 
-Euler = []
-Lab_supply = []
-for i in range(998):
-    ls, ee = ss.foc_log(c[i], c[i+1], n[i], n[i+1], k[i], k[i+1])
-    Euler.append(ee)
-    Lab_supply.append(ls)
-
-#sum of discounted utilities 
-V=0
-for t in range(999):
-    V += ss.beta**t * u[t]
-
-#plotting variable histories 
-plt.plot(k)
-plt.ylim(10, 15)
-plt.axhline(k_ss, color="green")
-plt.title("k")
-plt.show()
-
-plt.plot(c)
-plt.ylim(0.7, 1.1)
-plt.axhline(c_ss, color="green")
-plt.title("c")
-plt.show()
-
-plt.plot(n)
-plt.ylim(0, 1)
-plt.axhline(n_ss, color="green")
-plt.title("n")
-plt.show()
-
-plt.plot(y)
-plt.ylim(0, 2)
-plt.axhline(y_ss, color="green")
-plt.title("y")
-plt.show()
-
-plt.plot(u)
-plt.ylim(-1.3, 0)
-plt.axhline(u_ss, color="green")
-plt.title("u")
-plt.show()
-
-plt.plot(Euler)
-plt.title('delta Euler')
-plt.show()
-
-plt.plot(Lab_supply)
-plt.title('delta Labour supply')
-plt.show()
-
-print(f"Steady state value = {v_ss}; Value reached by last simulation = {V}")
-print(f"Steady state beats RL by:{V-v_ss}")'
-'''
 

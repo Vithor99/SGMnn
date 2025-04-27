@@ -13,6 +13,10 @@ class steady:
         self.var_eps_z = 0.001 #variance of TFP shock 
         self.states = 2 
         self.actions = 2
+
+    def get_consumption(self, k, z, n):
+        c = (self.gamma/self.psi)*(1-n)*z*(1-self.alpha)*((k/n)**self.alpha)
+        return c
     
     def equations(self, vars):
         c, n, k = vars
@@ -48,10 +52,16 @@ class steady:
 
         return v_ss 
     
-    def foc_log(self, c, c1, n, n1, k, k1):
-        ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(c/(1-n))
-        ee = (self.gamma/c) - self.beta*(self.gamma/c1)*((1-self.delta)+self.alpha*k1**(self.alpha-1)*n1**(1-self.alpha)) 
-        return ls, ee
+    def foc_log(self, c0, c1, n0, n1, z0, k0, k1):
+        #ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(c/(1-n))
+        #ee = (self.gamma/c) - self.beta*(self.gamma/c1)*((1-self.delta)+self.alpha*k1**(self.alpha-1)*n1**(1-self.alpha))
+        E_z1 = (1-ss.rhoa) + ss.rhoa * z0
+        c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
+        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
+        c_ratio = c1/c0
+        labor_gap = np.abs((c0 - c0_star)/c0_star)
+        euler_gap = np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+        return labor_gap, euler_gap
     
     def foc_sqrt(self, c, c1, n, n1, k, k1):
         ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(np.sqrt(c)/np.sqrt(1-n))
