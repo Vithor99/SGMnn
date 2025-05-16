@@ -102,10 +102,8 @@ class StochasticPolicyNetwork(nn.Module):
             dist_0 = D.TransformedDistribution(base_dist, transform)
         else:
             ''' questo e' senza '''
-            # dist_0 = Normal(mean[:, 0], std[:, 0])
-
             lower_bound = torch.zeros_like(mean[:, 0])
-            upper_bound = torch.ones_like(mean[:, 0]) * 1.
+            upper_bound = torch.ones_like(mean[:, 0])
             base_dist = D.Normal(mean[:, 0], std[:, 0])
             sigmoid_transform = T.SigmoidTransform()
             affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))

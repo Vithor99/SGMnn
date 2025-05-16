@@ -49,12 +49,14 @@ class Model(gym.Env):
         #rescale magnitueds coming from NN
         z = self.state[0]
         k = self.state[1]
-        c = action[0]
+        #c = action[0]
+        c_ratio = action[0]                                                                        # added
         n = action[1]
-
+        
         #compute Penalty / reward
         y = z* (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
+        c = c_ratio*y                                                                               # added
 
         if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
@@ -79,7 +81,7 @@ class Model(gym.Env):
         if self.time >= self.T:
             done = True
 
-        return new_state, U, done, False, {'y': y}
+        return new_state, U, done, False, {'y': y, 'c': c}
 
 
 

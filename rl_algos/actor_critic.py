@@ -72,6 +72,7 @@ class ActorCritic(nn.Module):
         util = util[idx].detach()
         actions = actions[idx].detach()
         #terminal = terminal[idx]
+        
         #MOD1: center V at zero. 
         rewards = util - self.u_ss
 

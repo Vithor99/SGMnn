@@ -42,7 +42,7 @@ parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
-parser.add_argument('--use_hard_bounds', default=1, type=int)
+parser.add_argument('--use_hard_bounds', default=0, type=int) #default=0 for both actions selcted in (0,1) 
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
@@ -62,7 +62,7 @@ model_type = initial_k + "_" + version
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_debug3_"
+        name_exp += str(k) + "=" + str(v) + "_debug4_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -206,14 +206,16 @@ for iter in tqdm(range(EPOCHS)):
                 with torch.no_grad():
                     action_tensor, log_prob = agent.get_action(st_tensor, test=True)
                     a = action_tensor.squeeze().numpy()
-                    st1, u, done, _, y = test_sim.step(a)
-                    y = y['y']
+                    st1, u, done, _, rec = test_sim.step(a)
+                    y = rec['y']
+                    c = rec['c']
 
                     last_sim[t] = {'st': st,
                                    'a': a,
                                    'u': u,
                                    'st1': st1,
-                                   'y': y}
+                                   'y': y,
+                                   'c': c}
                     all_actions[t, :] = a
                     total_utility += (agent.gamma ** t) * u
 
@@ -230,8 +232,10 @@ for iter in tqdm(range(EPOCHS)):
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-                        c0 = all_actions[t-1,0]
-                        c1 = all_actions[t,0]
+
+                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]                                 #added
+                        c1 = last_sim[t]['c'] #all_actions[t,0]                                     #added
+
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
                         c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
@@ -243,7 +247,7 @@ for iter in tqdm(range(EPOCHS)):
                     #final distance from ss
                     if t==T_test-1:
                         last_state += st1[1]
-                        last_cons += all_actions[t,0]
+                        last_cons += last_sim[t]['c']
                         last_lab += all_actions[t, 1]
 
                     
