@@ -11,10 +11,11 @@ from torch.utils.tensorboard import SummaryWriter
 import argparse
 from steady import steady
 from scipy.interpolate import interp1d
+from scipy.interpolate import CubicSpline as interp
 
 '''CONTROLS'''
-rl_model = 'RBC_random_deterministic_T=550.pt' 
-grid_model = 'Grid_data_dev10pct.pkl'
+rl_model = 'RBC_random_stochastic.pt' 
+grid_model = 'Grid_data_stoch_dev10pct.pkl'
 
 run_simulation = "no" #if yes it runs the simulation
 if run_simulation == "yes":
@@ -23,10 +24,16 @@ if run_simulation == "yes":
     zoom = "in" # in or out: if out zoom factor is activated 
     zoom_factor = 10 # if zoom == "out": pct band around ss that we want to visualize
     run_foc = "yes" # if yes it runs the focs of the model
-        
-run_policy = "yes" # if yes it runs the policy evaluation
+    n = 200 # number of periods to compute the steady state of the simulation
+
+run_policy = "no" # if yes it runs the policy evaluation
 if run_policy == "yes":
     dev = 5
+    N = 500
+
+run_policy_sto = "yes"
+if run_policy_sto == "yes": 
+    dev = 5 
     N = 500
 
 
@@ -98,6 +105,21 @@ grid_model_path = 'saved_models/' + grid_model
 with open(grid_model_path, 'rb') as f:
     loaded_data = pickle.load(f)
 
+zgrid = ss.tauchenhussey(N=ss.nbz)[0]   # Discretized z values
+Pi = ss.tauchenhussey(N=ss.nbz)[1]      # Transition probabilities
+
+k = loaded_data['st']
+k1_star = loaded_data['k1_star']
+n_star = loaded_data['n_star']
+c_star = loaded_data['c_star']
+value_star = loaded_data['value_star']
+
+optimal_kp = interp(k, k1_star)
+optimal_n = interp(k, n_star)
+optimal_c = interp(k, c_star)
+optimal_v = interp(k, value_star)
+
+''' old grid solution 
 kgrid = loaded_data['kgrid']
 kp_star = loaded_data['kp_star']
 control_star = loaded_data['control_star']
@@ -106,14 +128,13 @@ optimal_kp = interp1d(kgrid, kp_star, kind="slinear", bounds_error=False, fill_v
 #optimal_c  = interp1d(kgrid, control_star[:, 0], kind="slinear", bounds_error=False, fill_value=0)
 optimal_n  = interp1d(kgrid, control_star, kind="slinear", bounds_error=False, fill_value=0)
 optimal_v = interp1d(kgrid, v_star, kind="slinear", bounds_error=False, fill_value=0)
-
-
-
-
+'''
 
 ''' SIMULATION '''
 if run_simulation == "yes":
     k = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    z = 1 #we want the same series for productivity in the two economies
+    z_psx = int(np.where(zgrid == 1)[0])
     grid_sim={}
     rl_sim={}
     grid_v = 0
@@ -124,7 +145,7 @@ if run_simulation == "yes":
 
     for t in range(T):
         #RL 
-        st = np.array([1, k[0]])
+        st = np.array([z, k[0]])
         state = torch.from_numpy(st).float().to(device)
         with torch.no_grad():
             action_tensor, _ = agent.get_action(state, test=True)
@@ -147,10 +168,11 @@ if run_simulation == "yes":
 
         #Grid 
         #a = np.array([optimal_c(k[1]), optimal_n(k[1])])
-        a = np.array([ss.get_consumption(k[1], 1, optimal_n(k[1])), optimal_n(k[1])])
+        # Find the position of the value 1 in zgrid
+        a = np.array([ss.get_consumption(k[1], 1, float(optimal_n(k[1])[z_psx])), float(optimal_n(k[1])[z_psx])])
         u = ss.gamma*np.log(a[0]) + ss.psi*np.log(1-a[1])
         grid_v += ss.beta**t * u
-        kp_grid = optimal_kp(k[1])
+        kp_grid = optimal_kp(k[1])[z_psx]
         grid_sim[t] = {'st': np.array([1, k[1]]),
                     'a': a,
                     'u': u,
@@ -164,12 +186,21 @@ if run_simulation == "yes":
                 labour_gap[t-1, 1] = l_gap
                 euler_gap[t-1, 1] = e_gap
 
-        k = np.array([st1_rl, kp_grid])
+        k = np.array([st1_rl, float(kp_grid)])
+        z1_psx = int(np.random.choice(ss.nbz, p=Pi[z_psx,:]))
+        z_psx = z1_psx
+        z = zgrid[z_psx]
 
     #Plotting
     #capital
     k_grid = [entry['st'][1] for entry in grid_sim.values()]
     k_rl = [entry['st'][1] for entry in rl_sim.values()]
+
+    #distance from steady state
+    rl_ss = np.mean(k_rl[-n:])
+    grid_ss = np.mean(k_grid[-n:])
+    ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
+    print(f"Capital distance from steady state: {ss_dev*100:.2f}%")
     
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(k_grid, color='blue', linewidth=1.5, label='Grid')
@@ -194,6 +225,12 @@ if run_simulation == "yes":
     c_grid = [entry['a'][0] for entry in grid_sim.values()]
     c_rl = [entry['a'][0] for entry in rl_sim.values()]
 
+    #distance from steady state
+    rl_ss = np.mean(c_rl[-n:])
+    grid_ss = np.mean(c_grid[-n:])
+    ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
+    print(f"Consumption distance from steady state: {ss_dev*100:.2f}%")
+
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(c_grid, color='blue', linewidth=1.5, label='Grid')
     ax.plot(c_rl, color='crimson', linewidth=1.5, label='RL')
@@ -216,6 +253,12 @@ if run_simulation == "yes":
     #labour
     n_grid = [entry['a'][1] for entry in grid_sim.values()]
     n_rl = [entry['a'][1] for entry in rl_sim.values()]
+
+    #distance from steady state
+    rl_ss = np.mean(n_rl[-n:])
+    grid_ss = np.mean(n_grid[-n:])
+    ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
+    print(f"Labour distance from steady state: {ss_dev*100:.2f}%")
 
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(n_grid, color='blue', linewidth=1.5, label='Grid')
@@ -299,13 +342,14 @@ if run_simulation == "yes":
 
 
 
-''' POLICY EVALUATION '''
+''' POLICY EVALUATION DETERMINISTIC'''
 if run_policy == "yes":
     c_values = np.zeros((N, 2))
     n_values = np.zeros((N, 2))
     k1_values = np.zeros((N, 2))
     v_values = np.zeros((N, 2))
     k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
+    z_psx = int(np.where(zgrid == 1)[0])
     for i in range(len(k_values)):
         #RL 
         st = np.array([1, k_values[i]])
@@ -320,15 +364,23 @@ if run_policy == "yes":
         k1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
         v_rl = float(value_rl)
         #Grid 
-        n_grid = optimal_n(k_values[i])
-        c_grid = ss.get_consumption(k_values[i], 1, n_grid)
-        k1_grid = optimal_kp(k_values[i])
-        v_grid = optimal_v(k_values[i])
+        n_grid = optimal_n(k_values[i])[z_psx]
+        c_grid = optimal_c(k_values[i])[z_psx]
+        k1_grid = optimal_kp(k_values[i])[z_psx]
+        v_grid = optimal_v(k_values[i])[z_psx]
         #save 
         c_values[i] = [c_rl, c_grid]
         n_values[i] = [n_rl, n_grid]
         k1_values[i] = [k1_rl, k1_grid]
         v_values[i] = [v_rl, v_grid]
+
+    # How much the RL policy deviates from Grid for a 5% deviation from steady state
+    p = len(k_values)-1
+    k_diff = (k_values[p] - k_ss) / np.abs(k_ss)
+    c_diff = (c_values[p, 0] - c_values[p, 1]) / np.abs(c_values[p, 1])
+    n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
+    print(f"Consumption deviation from grid policy for a {k_diff *100}% k deviation: {c_diff*100:.2f}%")
+    print(f"Labour deviation from grid policy for a {k_diff *100}% k deviation: {n_diff*100:.2f}%")
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
@@ -409,6 +461,144 @@ if run_policy == "yes":
     plt.tight_layout()
     plot_path = 'plots/' + rl_model.replace('.pt', '_value_function.png')
     fig.savefig(plot_path)
+
+
+
+'''POLICY EVALUATION STOCHASTIC'''
+if run_policy_sto == "yes":
+    c_values_rl = np.zeros((N, ss.nbz))
+    c_values_grid = np.zeros((N, ss.nbz))
+    n_values_rl = np.zeros((N, ss.nbz))
+    n_values_grid = np.zeros((N, ss.nbz))
+    k1_values_rl =  np.zeros((N, ss.nbz))
+    k1_values_grid = np.zeros((N, ss.nbz))
+    v_values_rl = np.zeros((N, ss.nbz))
+    v_values_grid = np.zeros((N, ss.nbz))
+    k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
+    #z_psx = int(np.where(zgrid == 1)[0])
+    for j in range(ss.nbz):
+        for i in range(len(k_values)):
+            #RL 
+            st = np.array([zgrid[j], k_values[i]])
+            state = torch.from_numpy(st).float().to(device)
+            with torch.no_grad():
+                action_tensor, _ = agent.get_action(state, test=True)
+                action_rl = action_tensor.squeeze().numpy()
+                value_tensor = agent.get_value(state)
+                value_rl = value_tensor.numpy()
+            c_values_rl[i,j] = action_rl[0]
+            n_values_rl[i,j] = action_rl[1]
+            k1_values_rl[i,j] = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+            v_values_rl[i,j] = float(value_rl)
+            #Grid 
+            n_values_grid[i,j] = optimal_n(k_values[i])[j]
+            c_values_grid[i,j] = optimal_c(k_values[i])[j]
+            k1_values_grid[i,j] = optimal_kp(k_values[i])[j]
+            v_values_grid[i,j] = optimal_v(k_values[i])[j]
+            #save 
+            #c_values_rl[i,j] = c_rl
+            #c_values_grid[i,j] = c_grid
+            #n_values_rl[i,j] = n_rl
+            #n_values_grid[i,j] = n_grid
+            #k1_values_rl[i,j] = k1_rl
+            #k1_values_grid[i,j] = k1_grid
+            #v_values_rl[i,j] = v_rl
+            #v_values_grid[i,j] = v_grid
+
+
+    # How much the RL policy deviates from Grid for a 5% deviation from steady state
+    #p = len(k_values)-1
+    #k_diff = (k_values[p] - k_ss) / np.abs(k_ss)
+    #c_diff = (c_values[p, 0] - c_values[p, 1]) / np.abs(c_values[p, 1])
+    #n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
+    #print(f"Consumption deviation from grid policy for a {k_diff *100}% k deviation: {c_diff*100:.2f}%")
+    #print(f"Labour deviation from grid policy for a {k_diff *100}% k deviation: {n_diff*100:.2f}%")
+    #plotting
+    #consumption
+    fig, ax = plt.subplots(figsize=(5, 6))
+    for i in range(ss.nbz): 
+        ax.plot(k_values, c_values_rl[:, i], color=f'C{i}', linewidth=1.5) #label=f'RL z={zgrid[i]}'
+        ax.plot(k_values, c_values_grid[:, i], color=f'C{i}', linestyle='--', linewidth=1.5)
+
+    ax.scatter(k_ss, c_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(c_ss, color='black', linestyle=':', linewidth=1)
+    ax.set_title("Consumption Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$c_t$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+    
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_cons_rule.png')
+    fig.savefig(plot_path)
+
+    #labour
+    fig, ax = plt.subplots(figsize=(5, 6))
+    for i in range(ss.nbz): 
+        ax.plot(k_values, n_values_rl[:, i], color=f'C{i}', linewidth=1.5)
+        ax.plot(k_values, n_values_grid[:, i], color=f'C{i}', linestyle='--', linewidth=1.5)
+    ax.scatter(k_ss, n_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(n_ss, color='black', linestyle=':', linewidth=1)
+    ax.set_title("Labour Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$n_t$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_lab_rule.png')
+    fig.savefig(plot_path)
+
+    #capital
+    fig, ax = plt.subplots(figsize=(5, 6))
+    for i in range(ss.nbz): 
+        ax.plot(k_values, k1_values_rl[:, i], color=f'C{i}', linewidth=1.5)
+        ax.plot(k_values, k1_values_grid[:, i], color=f'C{i}', linestyle='--', linewidth=1.5)
+    ax.scatter(k_ss, k_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.set_title("Saving Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$k_{t+1}$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_saving_rule.png')
+    fig.savefig(plot_path)
+
+    #value function
+    fig, ax = plt.subplots(figsize=(5, 6))
+    for i in range(ss.nbz): 
+        ax.plot(k_values, v_values_rl[:, i], color=f'C{i}', linewidth=1.5)
+        ax.plot(k_values, v_values_grid[:, i], color=f'C{i}', linestyle='--', linewidth=1.5)
+    ax.scatter(k_ss, v_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(v_ss, color='black', linestyle=':', linewidth=1)
+    ax.set_title("Value Function", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$V(k_t)$', fontstyle='italic')
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = 'plots/' + rl_model.replace('.pt', '_value_function.png')
+    fig.savefig(plot_path)
+
 
 
 

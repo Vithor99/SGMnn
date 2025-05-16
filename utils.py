@@ -9,7 +9,7 @@ from collections import deque
 
 
 def state_preprocessor(s):
-    return s/100
+    return s/10           #changed from 100
 
 
 def soft_update(nets, nets_target, tau=0.005):

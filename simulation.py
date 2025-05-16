@@ -3,11 +3,11 @@ import matplotlib.pyplot as plt
 import gymnasium as gym
 from gymnasium import spaces
 import warnings
-
+from steady import steady
 
 class Model(gym.Env):
 
-    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None, opt_consumption=None):
+    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, u_ss = 0, version=None):
         super().__init__()
 
         self.observation_space = spaces.Box(
@@ -28,8 +28,8 @@ class Model(gym.Env):
         self.k0 = k
         self.var_k = var_k
         self.noise = noise
+        self.u_ss = u_ss
         self.version = version
-        self.opt_consumption = opt_consumption
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -47,28 +47,27 @@ class Model(gym.Env):
 
     def step(self, action):
 
-        #rescale magnitueds coming from NN
         z = self.state[0]
         k = self.state[1]
-        if action.ndim == 0:
-            n = action
-            c = self.opt_consumption(k, z, n)
-        else:
-            c = action[0]
-            n = action[1]
+        cons_ratio = action[0] #c/y
+        n = action[1]
 
         #compute Penalty / reward
         y = z * (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
+        c = cons_ratio*y
 
-        if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
+        """ if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c                      #updates Capital level
+            k1 = (1-self.delta)*k + y - c                    #updates Capital level
             values = c/y                                       #debugging
             warnings.warn(f"Bounds are not working: {values}") #debugging
         else:
             U = self.gamma*np.log(c) + self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c  # updates Capital level
+            k1 = (1-self.delta)*k + y - c  # updates Capital level """
+        
+        U = (self.gamma*np.log(c) + self.psi*np.log(1-n) - self.u_ss)/np.abs(self.u_ss) #additional welfare created by RL policy. 
+        k1 = (1-self.delta)*k + y - c                                                   #updates Capital level
 
         if self.version =="deterministic":
             z1 = (1-self.rhoa) + self.rhoa*z  # updates tech.lvl
@@ -84,7 +83,7 @@ class Model(gym.Env):
         if self.time >= self.T:
             done = True
 
-        return new_state, U, done, False, {'y': y, 'c': c}
+        return new_state, U, done, False, {'y': y, 'c': cons_ratio*y}
 
 
 

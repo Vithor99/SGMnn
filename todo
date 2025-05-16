@@ -1,8 +1,5 @@
 
 1) convergenza migliore (piu stabile e piu utility)
-
-    a1) salvare value network..
-
     b) salva stati
     c) target network
     d) hyperparameter search architetura modello
@@ -11,4 +8,8 @@
 
 2) simulazioni piu high-dimensional and stochastic
 
-3) forse cluster alfredo
+3) Cluster TSE 
+
+Debugging) changes: 
+    1. utils line 12 
+    2. 
