@@ -173,3 +173,46 @@ class StochasticPolicyNetwork(nn.Module):
         log_prob = log_prob.sum(-1) if log_prob.dim() > 1 else log_prob
 
         return log_prob
+    
+    def get_dist(self, state):
+
+        state = state.view(1, -1) if state.dim() == 1 else state
+
+        mean, std = self.forward(state)
+
+        lower_bound = torch.zeros_like(mean[:, 1])
+        upper_bound = torch.ones_like(mean[:, 1]) * self.action_bounds['max'][1](None, None, None, None)
+        base_dist = D.Normal(mean[:, 1], std[:, 1])
+        sigmoid_transform = T.SigmoidTransform()
+        affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+        transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+        dist_1 = D.TransformedDistribution(base_dist, transform)
+        action_1 = dist_1.sample() 
+
+        ''' questo e' con i bound '''
+        if self.use_hard_bounds == 1:
+            lower_bound = torch.zeros_like(mean[:, 0])
+            upper_bound = torch.ones_like(mean[:, 0])
+            upper_bound *= self.action_bounds['max'][0](state[:, 0], state[:, 1], self.alpha, action_1)
+
+            base_dist = D.Normal(mean[:, 0], std[:, 0])
+            sigmoid_transform = T.SigmoidTransform()
+            affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+            transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+            dist_0 = D.TransformedDistribution(base_dist, transform)
+        else:
+            ''' questo e' senza '''
+            # dist_0 = Normal(mean[:, 0], std[:, 0])
+
+            lower_bound = torch.zeros_like(mean[:, 0])
+            upper_bound = torch.ones_like(mean[:, 0]) * 1.
+            base_dist = D.Normal(mean[:, 0], std[:, 0])
+            sigmoid_transform = T.SigmoidTransform()
+            affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+            transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+            dist_0 = D.TransformedDistribution(base_dist, transform)
+
+        sample0 = dist_0.sample([1000])
+        sample1 = dist_1.sample([1000])
+
+        return sample0, sample1
