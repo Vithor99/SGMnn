@@ -7,7 +7,7 @@ class steady:
         self.beta = 0.99 #0.99
         self.gamma = 1 #consumption pref
         self.psi = 1.6
-        self.delta = 0.025 #depreciation rate
+        self.delta = 0.025 #0.025 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
         self.var_eps_z = 0.001 #variance of TFP shock
@@ -28,21 +28,12 @@ class steady:
         solution = fsolve(self.equations, initial_guess)
         c_ss, n_ss, k_ss = solution
         y_ss = (k_ss)**self.alpha * (n_ss)**(1-self.alpha)
-        #u_ss = self.gamma*np.sqrt(c_ss)+self.psi*np.sqrt(1-n_ss)
         u_ss = self.gamma*np.log(c_ss)+self.psi*np.log(1-n_ss)
         v_ss = u_ss *(1/(1-ss.beta))
         return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss
     
         #include a function that computes the value with the number of periods as input 
     
-    """ def get_consumption(self, k, z, n):
-        c = (self.gamma/self.psi)*(1-n)*z*(1-self.alpha)*((k/n)**self.alpha)
-        return c
-    
-    def get_n_lb(self):
-        n_lb = ((self.gamma/self.psi)*(1-self.alpha))/(1+((self.gamma/self.psi)*(1-self.alpha)))
-        return n_lb  """
-
     def foc_log(self, c0, c1, n0, n1, z0, k0, k1):
         #ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(c/(1-n))
         #ee = (self.gamma/c) - self.beta*(self.gamma/c1)*((1-self.delta)+self.alpha*k1**(self.alpha-1)*n1**(1-self.alpha))
@@ -53,6 +44,8 @@ class steady:
         labor_gap = np.abs((c0 - c0_star)/c0_star)
         euler_gap = np.abs((c_ratio - c_ratio_star)/c_ratio_star)
         return labor_gap, euler_gap
+    
+
     
     def get_random_util(self, z, k):
         upper_bound_1 = 1.0

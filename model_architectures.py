@@ -34,8 +34,8 @@ class StochasticPolicyNetwork(nn.Module):
 
         self.var_scale = architecture_params['policy_var']
         self.learn_std = learn_std
-        #self.action_bounds = architecture_params['action_bounds']
-        #elf.use_hard_bounds = architecture_params['use_hard_bounds']
+        self.action_bounds = architecture_params['action_bounds']
+        self.use_hard_bounds = architecture_params['use_hard_bounds']
         self.alpha = alpha
 
         #self.learn_consumption = learn_consumption
@@ -87,9 +87,7 @@ class StochasticPolicyNetwork(nn.Module):
         lower_bound = torch.zeros_like(mean[:, 0])
         upper_bound = torch.ones_like(mean[:, 0]) 
 
-        base_dist_0 = D.Normal(mean[:, 0], std[:, 0])
-        base_dist_1 = D.Normal(mean[:, 1], std[:, 1])
-
+        base_dist = D.Normal(mean[:, 0], std[:, 0])
         sigmoid_transform = T.SigmoidTransform()
         affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
         transform = T.ComposeTransform([sigmoid_transform, affine_transform])
@@ -118,8 +116,6 @@ class StochasticPolicyNetwork(nn.Module):
             dist_0 = D.TransformedDistribution(base_dist, transform)
 
         action_0 = dist_0.sample() if not test else dist_0.sample([1000]).mean(0)
-        action_1 = dist_1.sample() if not test else dist_1.sample([1000]).mean(0)
-
         action = torch.stack([action_0, action_1], -1)
         log_prob = dist_0.log_prob(action_0) + dist_1.log_prob(action_1)
         log_prob = log_prob.sum(-1) if log_prob.dim() > 1 else log_prob
@@ -134,15 +130,36 @@ class StochasticPolicyNetwork(nn.Module):
         lower_bound = torch.zeros_like(mean[:, 0])
         upper_bound = torch.ones_like(mean[:, 0]) 
 
-        base_dist_0 = D.Normal(mean[:, 0], std[:, 0])
-        base_dist_1 = D.Normal(mean[:, 1], std[:, 1])
-
+        base_dist = D.Normal(mean[:, 0], std[:, 0])
         sigmoid_transform = T.SigmoidTransform()
         affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
         transform = T.ComposeTransform([sigmoid_transform, affine_transform])
-        dist_0 = D.TransformedDistribution(base_dist_0, transform)
-        dist_1 = D.TransformedDistribution(base_dist_1, transform)
+        dist_1 = D.TransformedDistribution(base_dist, transform)
+        #action_1 = dist_1.sample() if not test else dist_1.sample([1000]).mean(0)
 
+        ''' questo e' con i bound '''
+        if self.use_hard_bounds == 1:
+            lower_bound = torch.zeros_like(mean[:, 0])
+            upper_bound = torch.ones_like(mean[:, 0])
+            upper_bound *= self.action_bounds['max'][0](state[:, 0], state[:, 1], self.alpha, action_1)
+
+            base_dist = D.Normal(mean[:, 0], std[:, 0])
+            sigmoid_transform = T.SigmoidTransform()
+            affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+            transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+            dist_0 = D.TransformedDistribution(base_dist, transform)
+        else:
+            ''' questo e' senza '''
+            lower_bound = torch.zeros_like(mean[:, 0])
+            upper_bound = torch.ones_like(mean[:, 0])
+            base_dist = D.Normal(mean[:, 0], std[:, 0])
+            sigmoid_transform = T.SigmoidTransform()
+            affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
+            transform = T.ComposeTransform([sigmoid_transform, affine_transform])
+            dist_0 = D.TransformedDistribution(base_dist, transform)
+
+        #action_0 = dist_0.sample() if not test else dist_0.sample([1000]).mean(0)
+        #action = torch.stack([action_0, action_1], -1)
         log_prob = dist_0.log_prob(action[:,0]) + dist_1.log_prob(action[:,1])
         log_prob = log_prob.sum(-1) if log_prob.dim() > 1 else log_prob
 
@@ -161,7 +178,7 @@ class StochasticPolicyNetwork(nn.Module):
         affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
         transform = T.ComposeTransform([sigmoid_transform, affine_transform])
         dist_1 = D.TransformedDistribution(base_dist, transform)
-        action_1 = dist_1.sample() 
+        #action_1 = dist_1.sample() 
 
         ''' questo e' con i bound '''
         if self.use_hard_bounds == 1:

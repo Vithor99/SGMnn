@@ -77,7 +77,8 @@ class ActorCritic(nn.Module):
         #terminal = terminal[idx]
         
         #MOD1: center V at zero. 
-        rewards = util - self.u_ss
+        #rewards = util - self.u_ss
+        rewards = util
         
 
         # Compute the target values

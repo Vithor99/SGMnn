@@ -306,7 +306,7 @@ for iter in tqdm(range(EPOCHS)):
                 pickle.dump(last_sim, f)
 
             agent.save("RBC_"+ str(model_type))
-
+            
     #debug: Distributions over actions under steady state 
     """ if iter % 12 == 12-1:
         st, _ = test_sim.reset(options="steady") 
@@ -342,37 +342,5 @@ for iter in tqdm(range(EPOCHS)):
             
 
        
-
-
-    """ if iter % 12 == 12-1:
-        st, _ = test_sim.reset(options="steady") 
-        rnd_state0 = st[1]
-
-
-        st_tensor = torch.from_numpy(st).float().to(device)
-        with torch.no_grad():
-            sample0, sample1 = agent.get_dist(st_tensor)
-            # Create a figure with two subplots
-            plt.subplot(2, 1, 1)
-            plt.hist(sample0, bins=50, density=True, alpha=0.6)
-            plt.title("Histogram of c")
-            plt.xlabel("Value")
-            plt.ylabel("Density")
-            plt.axvline(c_ss, color='red', linestyle='dashed', label='c_ss')
-            plt.xlim(0, y_ss)
-            
-            plt.subplot(2, 1, 2)
-            plt.hist(sample1 - n_ss, bins=50, density=True, alpha=0.6, color='green')
-            plt.title("Histogram of n")
-            plt.xlabel("Value")
-            plt.ylabel("Density")
-            plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
-            plt.axvline(n_ss, color='red', linestyle='dashed', label='c_ss')
-            # Adjust layout and display the plots
-            plt.tight_layout()
-            plt.draw()
-            plt.pause(1)
-            if (iter // 12) % 4 == 3:
-                plt.clf() """
 
 
