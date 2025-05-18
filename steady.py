@@ -4,10 +4,10 @@ from scipy.optimize import fsolve
 
 class steady:
     def __init__(self):
-        self.beta = 0.95 #0.99
+        self.beta = 0.99 #0.99
         self.gamma = 1 #consumption pref
         self.psi = 1.6
-        self.delta = 0.1 #0.025 #depreciation rate
+        self.delta = 0.025 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
         self.var_eps_z = 0.001 #variance of TFP shock
@@ -28,15 +28,12 @@ class steady:
         solution = fsolve(self.equations, initial_guess)
         c_ss, n_ss, k_ss = solution
         y_ss = (k_ss)**self.alpha * (n_ss)**(1-self.alpha)
+        #u_ss = self.gamma*np.sqrt(c_ss)+self.psi*np.sqrt(1-n_ss)
         u_ss = self.gamma*np.log(c_ss)+self.psi*np.log(1-n_ss)
-        
-        return c_ss, n_ss, k_ss, y_ss, u_ss
+        v_ss = u_ss *(1/(1-ss.beta))
+        return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss
     
         #include a function that computes the value with the number of periods as input 
-    def ss_value(self):
-        u_ss = self.ss()[-1]
-        v_ss = u_ss * (1/(1-ss.beta))
-        return v_ss 
     
     """ def get_consumption(self, k, z, n):
         c = (self.gamma/self.psi)*(1-n)*z*(1-self.alpha)*((k/n)**self.alpha)
@@ -99,5 +96,5 @@ class steady:
 
 
 ss = steady()
-c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
     

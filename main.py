@@ -29,7 +29,7 @@ var_k0 = 15           #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
-frq_test = 100 
+frq_test = 500 
 EPOCHS = 45000
 
 
@@ -47,7 +47,7 @@ parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
-parser.add_argument('--use_hard_bounds', default=1, type=int)
+parser.add_argument('--use_hard_bounds', default=0, type=int) #default=0 for both actions selcted in (0,1) 
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
@@ -68,7 +68,7 @@ model_type = initial_k + "_" + version
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_"
+        name_exp += str(k) + "=" + str(v) + "_debug4_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -79,7 +79,7 @@ name_exp += str(sim_length)
 writer = SummaryWriter("logs/" + name_exp + "_debug")
 
 ''' Define Simulator'''
-c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 state_dim = ss.states
 action_dim = ss.actions 
 alpha = ss.alpha
@@ -151,10 +151,10 @@ sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 '''
 Start Training the model 
 '''
-vss_train = ss.ss_value()
+vss_train = v_ss
 frq_train = 3
 
-vss_test = ss.ss_value()
+vss_test = v_ss
 n_eval = 5
 best_utility = -np.inf
 
@@ -225,16 +225,17 @@ for iter in tqdm(range(EPOCHS)):
                 with torch.no_grad():
                     action_tensor, log_prob = agent.get_action(st_tensor, test=True)
                     a = action_tensor.squeeze().numpy()
-                    st1, u, done, _, yc = test_sim.step(a)
-                    y = yc['y']
-                    c = yc['c']
+                    st1, u, done, _, rec = test_sim.step(a)
+                    y = rec['y']
+                    c = rec['c']
 
                     last_sim[t] = {'st': st,
                                    'a': a,
                                    'c': c,
                                    'u': u,
                                    'st1': st1,
-                                   'y': y}
+                                   'y': y,
+                                   'c': c}
                     all_actions[t, :] = a
                     total_utility += (agent.gamma ** t) * u
 
@@ -251,8 +252,10 @@ for iter in tqdm(range(EPOCHS)):
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]
-                        c1 = last_sim[t]['c'] #all_actions[t,0]
+
+                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]                                 #added
+                        c1 = last_sim[t]['c'] #all_actions[t,0]                                     #added
+
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
                         c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
@@ -341,6 +344,35 @@ for iter in tqdm(range(EPOCHS)):
        
 
 
+    """ if iter % 12 == 12-1:
+        st, _ = test_sim.reset(options="steady") 
+        rnd_state0 = st[1]
 
+
+        st_tensor = torch.from_numpy(st).float().to(device)
+        with torch.no_grad():
+            sample0, sample1 = agent.get_dist(st_tensor)
+            # Create a figure with two subplots
+            plt.subplot(2, 1, 1)
+            plt.hist(sample0, bins=50, density=True, alpha=0.6)
+            plt.title("Histogram of c")
+            plt.xlabel("Value")
+            plt.ylabel("Density")
+            plt.axvline(c_ss, color='red', linestyle='dashed', label='c_ss')
+            plt.xlim(0, y_ss)
+            
+            plt.subplot(2, 1, 2)
+            plt.hist(sample1 - n_ss, bins=50, density=True, alpha=0.6, color='green')
+            plt.title("Histogram of n")
+            plt.xlabel("Value")
+            plt.ylabel("Density")
+            plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
+            plt.axvline(n_ss, color='red', linestyle='dashed', label='c_ss')
+            # Adjust layout and display the plots
+            plt.tight_layout()
+            plt.draw()
+            plt.pause(1)
+            if (iter // 12) % 4 == 3:
+                plt.clf() """
 
 

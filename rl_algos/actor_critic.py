@@ -14,7 +14,7 @@ from model_architectures import ValueNetwork, StochasticPolicyNetwork
 
 class ActorCritic(nn.Module):
 
-    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.95, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, learn_consumption=True, device=None):
+    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.95, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
         super(ActorCritic, self).__init__()
 
         self.epsilon = epsilon
@@ -34,6 +34,9 @@ class ActorCritic(nn.Module):
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
+
+        self.ss = steady()
+        self.c_ss, self.n_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
     
     def get_value(self, st):
         v = self.value_net(st).squeeze()
@@ -45,9 +48,9 @@ class ActorCritic(nn.Module):
         #     a = torch.rand((st.shape[0], 2))*0.15
         return a
     
-    def get_dist(self, st): 
-        dist, dist_raw = self.policy_net.get_dist(st)
-        return dist, dist_raw
+    def get_dist(self, st):
+        dist_c, dist_n = self.policy_net.get_dist(st)
+        return dist_c, dist_n
 
     def update(self):
 
@@ -62,18 +65,20 @@ class ActorCritic(nn.Module):
 
         states = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.st], 0)).float().to(self.device)
         next_states = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.st1], 0)).float().to(self.device)
-        rewards = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.u], 0)).float().to(self.device)
+        util = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.u], 0)).float().to(self.device)
         actions = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.a], 0)).float().to(self.device)
         #terminal = torch.from_numpy(np.concatenate([np.array([x]) for x in self.batchdata.terminal])).float().to(self.device)
 
         idx = np.random.choice(np.arange(states.shape[0]), self.batch_size)
         states = states[idx].detach()
         next_states = next_states[idx].detach()
-        rewards = rewards[idx].detach()
+        util = util[idx].detach()
         actions = actions[idx].detach()
         #terminal = terminal[idx]
-
-    
+        
+        #MOD1: center V at zero. 
+        rewards = util - self.u_ss
+        
 
         # Compute the target values
         with torch.no_grad():
@@ -84,6 +89,7 @@ class ActorCritic(nn.Module):
         predicted_values = self.value_net(states).squeeze()
         At = (target_values - predicted_values).detach()
         At_norm = At #(At - At.mean()) / (At.std() + 1e-7)
+        """ self.plot_adv(At, actions) """
 
         """ #start debug: Plotting Advantages
         c_ss, n_ss, k_ss, y_ss, u_ss = self.ss.ss()
@@ -119,6 +125,21 @@ class ActorCritic(nn.Module):
         self.optimizer_pi.step()
 
         return loss_V.detach().item(), policy_loss.detach().item()
+    
+    def plot_adv(self, At, actions): 
+        plt.clf()
+        plt.subplot(2, 1, 1)
+        plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
+        plt.xlim( 0, self.y_ss+0.5)
+        plt.axvline(self.c_ss, color='r', linestyle='--', label='c/y_ss')
+
+        plt.subplot(2, 1, 2)
+        plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='n')
+        plt.xlim( 0, 1)  # Set x-axis limits based on the sample
+        plt.axvline(self.n_ss, color='r', linestyle='--', label='n_ss')
+        
+        plt.draw()
+        plt.pause(1)
 
     def save(self, file_name):
         if not os.path.exists("saved_models"):
