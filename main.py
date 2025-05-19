@@ -65,7 +65,7 @@ model_type = initial_k + "_" + version
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_debugfin_"
+        name_exp += str(k) + "=" + str(v) + "_debugfin_main_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -238,7 +238,7 @@ for iter in tqdm(range(EPOCHS)):
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
                         #c0 = all_actions[t-1,0]
                         #c1 = all_actions[t,0]
-                        c0 = last_sim[t-1]['y']
+                        c0 = last_sim[t-1]['c']
                         c1 = last_sim[t]['c']
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
