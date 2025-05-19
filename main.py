@@ -18,19 +18,21 @@ import time
 
 
 '''CONTROLS'''
+#working version
 #deterministic runs version without shocks, None runs stochastic 
-version = "deterministic" # deterministic ; stochastic
+version = "deterministic" # deterministic ; stochastic 
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
-initial_k = "random" # steady ; random
+initial_k = "random" # steady ; random 
 var_k0 = 1           #Pct deviation from ss capital
-
-#learn_consumption = True
 
 T_test = 550
 T_train = 550
 frq_test = 500 
 EPOCHS = 45000
+
+plot_histogram = 0 #1 plots the action dist conitional on steady state 
+
 
 '''SETTING PARAMETERS''' 
 ss = steady()
@@ -67,7 +69,7 @@ model_type = initial_k + "_" + version
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_debug2_"
+        name_exp += str(k) + "=" + str(v) + "_debug2.4_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -160,11 +162,12 @@ for iter in tqdm(range(EPOCHS)):
         st_tensor = torch.from_numpy(st).float().to(device)
         with torch.no_grad():
             action_tensor, log_prob = agent.get_action(st_tensor)
-            a = action_tensor.cpu().numpy()
-            st1, u, done, _, y = sims.step(a)
+            a = action_tensor.numpy()
+            st1, u, done, _, rec = sims.step(a)
             #u_debug = ss.gamma*np.log(a[0]) + ss.psi * np.log(1-a[1])
 
-            y = y['y']
+            y = rec['y']
+            c = rec['c']
             for i in range(args.n_workers):
                 # agent.replay_buffer.push(st, a, u, st1, y)
                 agent.batchdata.push(st[i], a[i], log_prob[i].detach().cpu().numpy(), u[i], st1[i], y[i], float(not done[i]))
@@ -239,10 +242,10 @@ for iter in tqdm(range(EPOCHS)):
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-
-                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]                                 
-                        c1 = last_sim[t]['c'] #all_actions[t,0]                                     
-
+                        #c0 = all_actions[t-1,0]
+                        #c1 = all_actions[t,0]
+                        c0 = last_sim[t-1]['y']
+                        c1 = last_sim[t]['c']
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
                         c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
@@ -292,40 +295,41 @@ for iter in tqdm(range(EPOCHS)):
                 pickle.dump(last_sim, f)
 
             agent.save("RBC_"+ str(model_type))
-            
-    #debug: Distributions over actions under steady state 
-    """ if iter % 12 == 12-1:
-        st, _ = test_sim.reset(options="steady") 
-        rnd_state0 = st[1]
+
+    if plot_histogram == 1: 
+        if iter % 12 == 12-1:
+            st, _ = test_sim.reset(options="steady") 
+            rnd_state0 = st[1]
 
 
-        st_tensor = torch.from_numpy(st).float().to(device)
-        with torch.no_grad():
-            sample0, sample1 = agent.get_dist(st_tensor)
+            st_tensor = torch.from_numpy(st).float().to(device)
+            with torch.no_grad():
+                sample0, sample1 = agent.get_dist(st_tensor)
 
-            # Create a figure with two subplots
-            plt.subplot(2, 1, 1)
-            plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
-            plt.title("Histogram of c")
-            plt.xlabel("Value")
-            plt.ylabel("Density")
-            plt.xlim(0, 1.5)
-            
-            plt.subplot(2, 1, 2)
-            plt.hist(sample1, bins=50, density=True, alpha=0.6, color='green')
-            plt.title("Histogram of n")
-            plt.xlabel("Value")
-            plt.ylabel("Density")
-            plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
-            # Adjust layout and display the plots
-            plt.tight_layout()
-            plt.draw()
-            plt.pause(1)
-            plt.clf()
-            if (iter // 12) % 4 == 3:
-                plt.clf() """
-    #end debug
-            
+                # Create a figure with two subplots
+                plt.subplot(2, 1, 1)
+                plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
+                plt.axvline(c_ss, color='r', linestyle='--', label='c')
+                plt.title("Histogram of c")
+                plt.xlabel("Value")
+                plt.ylabel("Density")
+                plt.xlim(0, 1.5)
+                
+                plt.subplot(2, 1, 2)
+                plt.hist(sample1, bins=50, density=True, alpha=0.6, color='green')
+                plt.axvline(n_ss, color='r', linestyle='--', label='c')
+                plt.title("Histogram of n")
+                plt.xlabel("Value")
+                plt.ylabel("Density")
+                plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
+                # Adjust layout and display the plots
+                plt.tight_layout()
+                plt.draw()
+                plt.pause(1)
+                if (iter // 12) % 4 == 3:
+                    plt.clf() 
+       
+
 
        
 

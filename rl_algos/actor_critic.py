@@ -6,10 +6,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 import random
 from utils import BatchData
-from steady import steady
 import matplotlib.pyplot as plt
-from steady import steady
 from model_architectures import ValueNetwork, StochasticPolicyNetwork
+from steady import steady
 
 
 class ActorCritic(nn.Module):
@@ -44,9 +43,9 @@ class ActorCritic(nn.Module):
         #     a = torch.rand((st.shape[0], 2))*0.15
         return a
     
-    def get_dist(self, st):
-        dist_c, dist_n = self.policy_net.get_dist(st)
-        return dist_c, dist_n
+    def get_dist(self, st): 
+        sample0, sample1 = self.policy_net.get_dist(st)
+        return sample0, sample1
 
     def update(self):
 
@@ -86,9 +85,9 @@ class ActorCritic(nn.Module):
         predicted_values = self.value_net(states).squeeze()
         At = (target_values - predicted_values).detach()
         At_norm = At #(At - At.mean()) / (At.std() + 1e-7)
-        
-        """ self.plot_adv(At, actions) """
-    
+
+        #self.plot_adv(At, actions)
+
         # Compute the loss
         loss_V = self.loss_fn(predicted_values, target_values)
 
@@ -105,21 +104,6 @@ class ActorCritic(nn.Module):
         self.optimizer_pi.step()
 
         return loss_V.detach().item(), policy_loss.detach().item()
-    
-    def plot_adv(self, At, actions): 
-        plt.clf()
-        plt.subplot(2, 1, 1)
-        plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
-        plt.xlim( 0, self.y_ss+0.5)
-        plt.axvline(self.c_ss, color='r', linestyle='--', label='c/y_ss')
-
-        plt.subplot(2, 1, 2)
-        plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='n')
-        plt.xlim( 0, 1)  # Set x-axis limits based on the sample
-        plt.axvline(self.n_ss, color='r', linestyle='--', label='n_ss')
-        
-        plt.draw()
-        plt.pause(1)
 
     def save(self, file_name):
         if not os.path.exists("saved_models"):
@@ -128,6 +112,20 @@ class ActorCritic(nn.Module):
 
     def load(self, file_name):
         self.load_state_dict(torch.load("saved_models/" + file_name + ".pt"))
+
+    def plot_adv(self, At, actions): 
+        plt.clf()
+        plt.subplot(2, 1, 1)
+        plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
+        plt.xlim( 0, 1.5)
+        plt.axvline(self.c_ss, color='r', linestyle='--', label='c')
+
+        plt.subplot(2, 1, 2)
+        plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='cons ratio')
+        plt.xlim( 0, 1)
+        plt.axvline(self.n_ss, color='r', linestyle='--', label='c')
+
+        plt.show() 
 
 
 

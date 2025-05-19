@@ -6,9 +6,6 @@ from torch.distributions import Normal
 import torch.distributions as D
 import torch.distributions.transforms as T
 from utils import state_preprocessor
-import matplotlib.pyplot as plt
-from steady import steady
-
 
 class ValueNetwork(nn.Module):
     def __init__(self, input_dim, architecture_params, output_dim):
@@ -36,9 +33,6 @@ class StochasticPolicyNetwork(nn.Module):
         self.action_bounds = architecture_params['action_bounds']
         self.use_hard_bounds = architecture_params['use_hard_bounds']
         self.alpha = alpha
-
-        #self.learn_consumption = learn_consumption
-        self.ss = steady()
 
         layers = [nn.Linear(state_dim, architecture_params['n_neurons']), nn.ReLU()]
         for _ in range(architecture_params['n_layers']):
@@ -164,6 +158,7 @@ class StochasticPolicyNetwork(nn.Module):
 
         return log_prob
     
+    
     def get_dist(self, state):
 
         state = state.view(1, -1) if state.dim() == 1 else state
@@ -177,8 +172,8 @@ class StochasticPolicyNetwork(nn.Module):
         affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
         transform = T.ComposeTransform([sigmoid_transform, affine_transform])
         dist_1 = D.TransformedDistribution(base_dist, transform)
-        action_1 = dist_1.sample() 
-
+        action_1 = dist_1.sample([1000]).mean(0)
+        sample1 = dist_1.sample([1000])
         ''' questo e' con i bound '''
         if self.use_hard_bounds == 1:
             lower_bound = torch.zeros_like(mean[:, 0])
@@ -203,6 +198,5 @@ class StochasticPolicyNetwork(nn.Module):
             dist_0 = D.TransformedDistribution(base_dist, transform)
 
         sample0 = dist_0.sample([1000])
-        sample1 = dist_1.sample([1000])
 
         return sample0, sample1
