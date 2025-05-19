@@ -15,6 +15,7 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
+#working version
 #deterministic runs version without shocks, None runs stochastic 
 version = "deterministic" # deterministic ; stochastic 
 
