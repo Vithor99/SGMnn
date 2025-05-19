@@ -49,26 +49,23 @@ class Model(gym.Env):
 
         z = self.state[0]
         k = self.state[1]
-        #c = action[0]
-        c_ratio = action[0]                                                                        # added
+        c = action[0]
+        #c_ratio = action[0]                                                                        
         n = action[1]
         
         #compute Penalty / reward
         y = z * (k**self.alpha) * (n**(1-self.alpha))
         y = np.nan_to_num(y, nan=0.0)
-        c = c_ratio*y                                                                               # added
+        #c = c_ratio*y                                                                               
 
-        """ if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
+        if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
             U = self.gamma*np.log(c)+self.psi*np.log(1-n)
             k1 = (1-self.delta)*k + y - c                    #updates Capital level
             values = c/y                                       #debugging
             warnings.warn(f"Bounds are not working: {values}") #debugging
         else:
             U = self.gamma*np.log(c) + self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c  # updates Capital level """
-        
-        U = (self.gamma*np.log(c) + self.psi*np.log(1-n) - self.u_ss)/np.abs(self.u_ss) #additional welfare created by RL policy. 
-        k1 = (1-self.delta)*k + y - c                                                   #updates Capital level
+            k1 = (1-self.delta)*k + y - c  # updates Capital level 
 
         if self.version =="deterministic":
             z1 = (1-self.rhoa) + self.rhoa*z  # updates tech.lvl

@@ -28,7 +28,6 @@ class ValueNetwork(nn.Module):
 
 
 class StochasticPolicyNetwork(nn.Module):
-
     def __init__(self, state_dim, architecture_params, action_dim, alpha=0, learn_std=True):
         super(StochasticPolicyNetwork, self).__init__()
 
@@ -141,7 +140,7 @@ class StochasticPolicyNetwork(nn.Module):
         if self.use_hard_bounds == 1:
             lower_bound = torch.zeros_like(mean[:, 0])
             upper_bound = torch.ones_like(mean[:, 0])
-            upper_bound *= self.action_bounds['max'][0](state[:, 0], state[:, 1], self.alpha, action_1)
+            upper_bound *= self.action_bounds['max'][0](state[:, 0], state[:, 1], self.alpha, action[:,0])
 
             base_dist = D.Normal(mean[:, 0], std[:, 0])
             sigmoid_transform = T.SigmoidTransform()
@@ -178,7 +177,7 @@ class StochasticPolicyNetwork(nn.Module):
         affine_transform = T.AffineTransform(loc=lower_bound, scale=(upper_bound - lower_bound))
         transform = T.ComposeTransform([sigmoid_transform, affine_transform])
         dist_1 = D.TransformedDistribution(base_dist, transform)
-        #action_1 = dist_1.sample() 
+        action_1 = dist_1.sample() 
 
         ''' questo e' con i bound '''
         if self.use_hard_bounds == 1:

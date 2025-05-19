@@ -22,8 +22,8 @@ import time
 version = "deterministic" # deterministic ; stochastic
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
-initial_k = "steady" # steady ; random
-var_k0 = 15           #Pct deviation from ss capital
+initial_k = "random" # steady ; random
+var_k0 = 1           #Pct deviation from ss capital
 
 #learn_consumption = True
 
@@ -31,7 +31,6 @@ T_test = 550
 T_train = 550
 frq_test = 500 
 EPOCHS = 45000
-
 
 '''SETTING PARAMETERS''' 
 ss = steady()
@@ -41,13 +40,13 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-3, type=float)
+parser.add_argument('--policy_var', default=-3.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
-parser.add_argument('--use_hard_bounds', default=0, type=int) #default=0 for both actions selcted in (0,1) 
+parser.add_argument('--use_hard_bounds', default=1, type=int) #default=0 for both actions selcted in (0,1) 
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
@@ -68,7 +67,7 @@ model_type = initial_k + "_" + version
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_debug4_"
+        name_exp += str(k) + "=" + str(v) + "_debug2_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -76,7 +75,7 @@ name_exp += str(model_type)
 if initial_k == "random":
     name_exp += "_var="+str(var_k0)
 name_exp += str(sim_length)
-writer = SummaryWriter("logs/" + name_exp + "_debug")
+writer = SummaryWriter("logs/" + name_exp)
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
@@ -84,27 +83,22 @@ state_dim = ss.states
 action_dim = ss.actions 
 alpha = ss.alpha
 
-""" if learn_consumption:
-    action_bounds = {
-        'order': [1, 0],
-        'min': [lambda: 0,
-                lambda: 0],
-        'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
-                lambda s0, s1, alpha, a1: 1.0]
-        }
-else:
-    action_bounds = {
-        'min': [lambda : ss.get_n_lb()], #((ss.gamma/ss.psi)*(1-ss.alpha))/(1+((ss.gamma/ss.psi)*(1-ss.alpha)))],
-        'max': [lambda : 1.0]
-        } """
+
+action_bounds = {
+    'order': [1, 0],
+    'min': [lambda: 0,
+            lambda: 0],
+    'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
+            lambda s0, s1, alpha, a1: 1.0]
+    }
 
 
 ''' Define Model'''
 architecture_params = {'n_layers': args.n_layers,
                        'n_neurons': args.n_neurons,
-                       'policy_var': args.policy_var
-                       #'action_bounds': action_bounds,
-                       #'use_hard_bounds': args.use_hard_bounds
+                       'policy_var': args.policy_var,
+                       'action_bounds': action_bounds,
+                       'use_hard_bounds': args.use_hard_bounds
                        }
 
 agent = ActorCritic(input_dim=state_dim,
@@ -116,7 +110,6 @@ agent = ActorCritic(input_dim=state_dim,
                     batch_size=args.batch_size,
                     alpha=alpha,
                     learn_std=args.learn_std == 1,
-                    #learn_consumption=learn_consumption,
                     device=device).to(device)
 
 
@@ -167,10 +160,6 @@ for iter in tqdm(range(EPOCHS)):
         st_tensor = torch.from_numpy(st).float().to(device)
         with torch.no_grad():
             action_tensor, log_prob = agent.get_action(st_tensor)
-
-            # action_tensor = torch.tensor([[c_ss, n_ss]]*4)
-            # log_prob = torch.tensor([1.0]*4)
-
             a = action_tensor.cpu().numpy()
             st1, u, done, _, y = sims.step(a)
             #u_debug = ss.gamma*np.log(a[0]) + ss.psi * np.log(1-a[1])
@@ -183,9 +172,7 @@ for iter in tqdm(range(EPOCHS)):
             st = st1
             total_utility += np.mean((agent.gamma ** t) * u)
 
-
-    #writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train - total_utility)/total_utility)*100 , iter) # instead of 0 v_ss % of additional utility in steady state
-    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-total_utility)*100 , iter) #not really correct
+    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train - total_utility)/total_utility)*100 , iter) 
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -253,8 +240,8 @@ for iter in tqdm(range(EPOCHS)):
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
 
-                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]                                 #added
-                        c1 = last_sim[t]['c'] #all_actions[t,0]                                     #added
+                        c0 = last_sim[t-1]['c'] #all_actions[t-1,0]                                 
+                        c1 = last_sim[t]['c'] #all_actions[t,0]                                     
 
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
@@ -288,9 +275,8 @@ for iter in tqdm(range(EPOCHS)):
 
         writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
         writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap*100, iter)
-        #writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-(vss_test-total_utility)/total_utility)*100 , iter) #vss_test
-        writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-total_utility)*100 , iter) #not really correct
-        #writer.add_scalar("pct welfare gain of current policy to random policy", (-(total_utility-random_util)/random_util)*100 , iter) 
+        writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-(vss_test-total_utility)/total_utility)*100 , iter) #vss_test
+        writer.add_scalar("pct welfare gain of current policy to random policy", (-(total_utility-random_util)/random_util)*100 , iter) 
         writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
         writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
         writer.add_scalar("pct distance of n to n_ss", (np.abs(last_lab - n_ss)/n_ss)*100, iter)
@@ -319,18 +305,18 @@ for iter in tqdm(range(EPOCHS)):
 
             # Create a figure with two subplots
             plt.subplot(2, 1, 1)
-            plt.hist(sample0 - (c_ss/y_ss), bins=50, density=True, alpha=0.6, color='blue')
-            plt.title("Histogram of c/y")
+            plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
+            plt.title("Histogram of c")
             plt.xlabel("Value")
             plt.ylabel("Density")
-            plt.xlim(0 - (c_ss/y_ss), 1 - - (c_ss/y_ss))
+            plt.xlim(0, 1.5)
             
             plt.subplot(2, 1, 2)
-            plt.hist(sample1 - n_ss, bins=50, density=True, alpha=0.6, color='green')
+            plt.hist(sample1, bins=50, density=True, alpha=0.6, color='green')
             plt.title("Histogram of n")
             plt.xlabel("Value")
             plt.ylabel("Density")
-            plt.xlim(0 - n_ss, 1 - n_ss) #np.max([sample.max() - n_ss, 0])
+            plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
             # Adjust layout and display the plots
             plt.tight_layout()
             plt.draw()

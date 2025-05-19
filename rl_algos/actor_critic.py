@@ -14,7 +14,7 @@ from model_architectures import ValueNetwork, StochasticPolicyNetwork
 
 class ActorCritic(nn.Module):
 
-    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.95, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
+    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
         super(ActorCritic, self).__init__()
 
         self.epsilon = epsilon
@@ -28,13 +28,9 @@ class ActorCritic(nn.Module):
         self.value_net = ValueNetwork(input_dim, architecture_params, 1)
         self.policy_net = StochasticPolicyNetwork(input_dim, architecture_params, output_dim, alpha=alpha, learn_std=learn_std)
         self.ss = steady()
-        self.v_ss = self.ss.ss_value()
-        self.u_ss = self.ss.ss()[-1]
-
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
-
         self.ss = steady()
         self.c_ss, self.n_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
     
@@ -90,26 +86,9 @@ class ActorCritic(nn.Module):
         predicted_values = self.value_net(states).squeeze()
         At = (target_values - predicted_values).detach()
         At_norm = At #(At - At.mean()) / (At.std() + 1e-7)
+        
         """ self.plot_adv(At, actions) """
-
-        """ #start debug: Plotting Advantages
-        c_ss, n_ss, k_ss, y_ss, u_ss = self.ss.ss()
-        plt.clf()
-        plt.subplot(2, 1, 1)
-        plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
-        plt.xlim( 0, 1)
-        plt.axvline(c_ss/y_ss, color='r', linestyle='--', label='c/y_ss')
-
-        plt.subplot(2, 1, 2)
-        plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='n')
-        plt.xlim( 0, 1)  # Set x-axis limits based on the sample
-        plt.axvline(n_ss, color='r', linestyle='--', label='n_ss')
-        
-        plt.draw()
-        plt.pause(1)
-        #end debug """
-        
-
+    
         # Compute the loss
         loss_V = self.loss_fn(predicted_values, target_values)
 

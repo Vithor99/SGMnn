@@ -119,7 +119,7 @@ optimal_n = interp(k, n_star)
 optimal_c = interp(k, c_star)
 optimal_v = interp(k, value_star)
 
-''' old grid solution 
+''' Old grid solution 
 kgrid = loaded_data['kgrid']
 kp_star = loaded_data['kp_star']
 control_star = loaded_data['control_star']
