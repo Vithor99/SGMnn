@@ -6,8 +6,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 import random
 from utils import BatchData
-
+import matplotlib.pyplot as plt
 from model_architectures import ValueNetwork, StochasticPolicyNetwork
+from steady import steady
 
 
 class ActorCritic(nn.Module):
@@ -29,6 +30,8 @@ class ActorCritic(nn.Module):
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
+        self.ss = steady()
+        self.c_ss, self.n_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
     
     def get_value(self, st):
         v = self.value_net(st).squeeze()
@@ -39,6 +42,10 @@ class ActorCritic(nn.Module):
         if np.random.rand() < self.epsilon and not test:
             a = torch.rand((st.shape[0], 2))*0.15
         return a
+    
+    def get_dist(self, st): 
+        sample0, sample1 = self.policy_net.get_dist(st)
+        return sample0, sample1
 
     def update(self):
 
@@ -74,6 +81,8 @@ class ActorCritic(nn.Module):
         At = (target_values - predicted_values).detach()
         At_norm = At #(At - At.mean()) / (At.std() + 1e-7)
 
+        #self.plot_adv(At, actions)
+
         # Compute the loss
         loss_V = self.loss_fn(predicted_values, target_values)
 
@@ -100,6 +109,20 @@ class ActorCritic(nn.Module):
 
     def load(self, file_name):
         self.load_state_dict(torch.load("saved_models/" + file_name + ".pt"))
+
+    def plot_adv(self, At, actions): 
+        plt.clf()
+        plt.subplot(2, 1, 1)
+        plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
+        plt.xlim( 0, 1.5)
+        plt.axvline(self.c_ss, color='r', linestyle='--', label='c')
+
+        plt.subplot(2, 1, 2)
+        plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='cons ratio')
+        plt.xlim( 0, 1)
+        plt.axvline(self.n_ss, color='r', linestyle='--', label='c')
+
+        plt.show() 
 
 
 

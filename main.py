@@ -16,16 +16,18 @@ from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
 #deterministic runs version without shocks, None runs stochastic 
-version = "stochastic" # deterministic ; stochastic 
+version = "deterministic" # deterministic ; stochastic 
 
 #steady starts capital from ss, None from a uniform dist around ss with var_k0
 initial_k = "random" # steady ; random 
-var_k0 = 15           #Pct deviation from ss capital
+var_k0 = 1           #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
 frq_test = 500 
-EPOCHS = 60000
+EPOCHS = 45000
+
+plot_histogram = 0 #1 plots the action dist conitional on steady state 
 
 
 '''SETTING PARAMETERS''' 
@@ -73,7 +75,7 @@ name_exp += str(sim_length)
 writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
-c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
@@ -137,10 +139,10 @@ sims = SyncVectorEnv([make_env for _ in range(args.n_workers)])
 '''
 Start Training the model 
 '''
-vss_train = ss.ss_value(T_train)
+vss_train = v_ss
 frq_train = 3
 
-vss_test = ss.ss_value(T_test)
+vss_test = v_ss
 n_eval = 5
 best_utility = -np.inf
 
@@ -154,10 +156,11 @@ for iter in tqdm(range(EPOCHS)):
         with torch.no_grad():
             action_tensor, log_prob = agent.get_action(st_tensor)
             a = action_tensor.numpy()
-            st1, u, done, _, y = sims.step(a)
+            st1, u, done, _, rec = sims.step(a)
             #u_debug = ss.gamma*np.log(a[0]) + ss.psi * np.log(1-a[1])
 
-            y = y['y']
+            y = rec['y']
+            c = rec['c']
             for i in range(args.n_workers):
                 # agent.replay_buffer.push(st, a, u, st1, y)
                 agent.batchdata.push(st[i], a[i], log_prob[i].detach().cpu().numpy(), u[i], st1[i], y[i], float(not done[i]))
@@ -206,14 +209,16 @@ for iter in tqdm(range(EPOCHS)):
                 with torch.no_grad():
                     action_tensor, log_prob = agent.get_action(st_tensor, test=True)
                     a = action_tensor.squeeze().numpy()
-                    st1, u, done, _, y = test_sim.step(a)
-                    y = y['y']
+                    st1, u, done, _, rec = test_sim.step(a)
+                    y = rec['y']
+                    c = rec['c']
 
                     last_sim[t] = {'st': st,
                                    'a': a,
                                    'u': u,
                                    'st1': st1,
-                                   'y': y}
+                                   'y': y,
+                                   'c': c}
                     all_actions[t, :] = a
                     total_utility += (agent.gamma ** t) * u
 
@@ -230,8 +235,10 @@ for iter in tqdm(range(EPOCHS)):
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-                        c0 = all_actions[t-1,0]
-                        c1 = all_actions[t,0]
+                        #c0 = all_actions[t-1,0]
+                        #c1 = all_actions[t,0]
+                        c0 = last_sim[t-1]['y']
+                        c1 = last_sim[t]['c']
                         n0 = all_actions[t-1,1]
                         n1 = all_actions[t,1]
                         c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
@@ -243,7 +250,7 @@ for iter in tqdm(range(EPOCHS)):
                     #final distance from ss
                     if t==T_test-1:
                         last_state += st1[1]
-                        last_cons += all_actions[t,0]
+                        last_cons += last_sim[t]['c']
                         last_lab += all_actions[t, 1]
 
                     
@@ -280,6 +287,39 @@ for iter in tqdm(range(EPOCHS)):
                 pickle.dump(last_sim, f)
 
             agent.save("RBC_"+ str(model_type))
+
+    if plot_histogram == 1: 
+        if iter % 12 == 12-1:
+            st, _ = test_sim.reset(options="steady") 
+            rnd_state0 = st[1]
+
+
+            st_tensor = torch.from_numpy(st).float().to(device)
+            with torch.no_grad():
+                sample0, sample1 = agent.get_dist(st_tensor)
+
+                # Create a figure with two subplots
+                plt.subplot(2, 1, 1)
+                plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
+                plt.axvline(c_ss, color='r', linestyle='--', label='c')
+                plt.title("Histogram of c")
+                plt.xlabel("Value")
+                plt.ylabel("Density")
+                plt.xlim(0, 1.5)
+                
+                plt.subplot(2, 1, 2)
+                plt.hist(sample1, bins=50, density=True, alpha=0.6, color='green')
+                plt.axvline(n_ss, color='r', linestyle='--', label='c')
+                plt.title("Histogram of n")
+                plt.xlabel("Value")
+                plt.ylabel("Density")
+                plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
+                # Adjust layout and display the plots
+                plt.tight_layout()
+                plt.draw()
+                plt.pause(1)
+                if (iter // 12) % 4 == 3:
+                    plt.clf() 
        
 
 

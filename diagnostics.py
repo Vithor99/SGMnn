@@ -36,8 +36,7 @@ run_add_analysis = "no" # if yes it runs some other stuff
 '''LOADING MODELS'''
 # Loading model steady state
 ss = steady()
-c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
-v_ss = ss.ss_value(1000)
+c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 
 # Loading RL policy
 parser = argparse.ArgumentParser()
@@ -94,6 +93,7 @@ agent.eval()
 
 
 # Loading Grid (vi) policy
+#need to update for stochastic version 
 grid_model_path = 'saved_models/' + grid_model
 with open(grid_model_path, 'rb') as f:
     loaded_data = pickle.load(f)

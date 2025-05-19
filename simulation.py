@@ -79,7 +79,7 @@ class Model(gym.Env):
         if self.time >= self.T:
             done = True
 
-        return new_state, U, done, False, {'y': y}
+        return new_state, U, done, False, {'y': y, 'c': c}
 
 
 

@@ -37,11 +37,9 @@ class steady:
         #u_ss = self.gamma*np.sqrt(c_ss)+self.psi*np.sqrt(1-n_ss)
         u_ss = self.gamma*np.log(c_ss)+self.psi*np.log(1-n_ss)
 
-        v_ss = 0
-        for t in range(100):
-            v_ss += (self.beta**t) * u_ss
+        v_ss = (1/(1-self.beta))*u_ss
         
-        return c_ss, n_ss, k_ss, y_ss, u_ss
+        return c_ss, n_ss, k_ss, y_ss, u_ss, v_ss 
     
         #include a function that computes the value with the number of periods as input 
     def ss_value(self, T):
@@ -107,5 +105,5 @@ class steady:
 
 
 ss = steady()
-c_ss, n_ss, k_ss, y_ss, u_ss = ss.ss()
+c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
     
