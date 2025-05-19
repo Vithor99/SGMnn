@@ -14,9 +14,6 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
-import time
-
-
 '''CONTROLS'''
 #working version
 #deterministic runs version without shocks, None runs stochastic 
@@ -48,7 +45,7 @@ parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--batch_size', default=2048, type=int)
 parser.add_argument('--learn_std', default=0, type=int)
-parser.add_argument('--use_hard_bounds', default=1, type=int) #default=0 for both actions selcted in (0,1) 
+parser.add_argument('--use_hard_bounds', default=1, type=int)
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
@@ -62,14 +59,13 @@ torch.cuda.manual_seed(seed)
 
 # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu')
-
 name_exp = ''
 #string to indicate type in logs
 model_type = initial_k + "_" + version 
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_debug2.4_"
+        name_exp += str(k) + "=" + str(v) + "_debugfin_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -77,17 +73,17 @@ name_exp += str(model_type)
 if initial_k == "random":
     name_exp += "_var="+str(var_k0)
 name_exp += str(sim_length)
-writer = SummaryWriter("logs/" + name_exp)
+writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
 c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 state_dim = ss.states
-action_dim = ss.actions 
+action_dim = ss.actions
 alpha = ss.alpha
-
 
 action_bounds = {
     'order': [1, 0],
+    ''
     'min': [lambda: 0,
             lambda: 0],
     'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
@@ -111,7 +107,7 @@ agent = ActorCritic(input_dim=state_dim,
                     epsilon=args.epsilon_greedy,
                     batch_size=args.batch_size,
                     alpha=alpha,
-                    learn_std=args.learn_std == 1,
+                    learn_std=args.learn_std==1,
                     device=device).to(device)
 
 
@@ -127,9 +123,7 @@ register(
             'alpha': ss.alpha,
             'T': 1000,        #we can remove no? 
             'noise': ss.var_eps_z,
-            'u_ss': u_ss,
-            'version': version
-            },
+            'version': version},
 )
 
 def make_env():
@@ -175,7 +169,8 @@ for iter in tqdm(range(EPOCHS)):
             st = st1
             total_utility += np.mean((agent.gamma ** t) * u)
 
-    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train - total_utility)/total_utility)*100 , iter) 
+
+    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -198,8 +193,8 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap = 0
         labor_gap = 0
         last_state = 0
-        last_cons = 0
-        last_lab = 0
+        last_cons = 0 
+        last_lab =  0
         random_util = 0
 
         for _ in range(n_eval):
@@ -221,7 +216,6 @@ for iter in tqdm(range(EPOCHS)):
 
                     last_sim[t] = {'st': st,
                                    'a': a,
-                                   'c': c,
                                    'u': u,
                                    'st1': st1,
                                    'y': y,
@@ -278,14 +272,13 @@ for iter in tqdm(range(EPOCHS)):
 
         writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
         writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap*100, iter)
-        writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-(vss_test-total_utility)/total_utility)*100 , iter) #vss_test
+        writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-(vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", (-(total_utility-random_util)/random_util)*100 , iter) 
         writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
         writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
         writer.add_scalar("pct distance of n to n_ss", (np.abs(last_lab - n_ss)/n_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
-        if all_actions.shape[-1] > 1:
-            writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
+        writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
 
   
         if best_utility < total_utility:
@@ -328,9 +321,6 @@ for iter in tqdm(range(EPOCHS)):
                 plt.pause(1)
                 if (iter // 12) % 4 == 3:
                     plt.clf() 
-       
-
-
        
 
 
