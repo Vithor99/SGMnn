@@ -12,12 +12,16 @@ import argparse
 from steady import steady
 from scipy.interpolate import interp1d
 from scipy.interpolate import CubicSpline as interp
+import warnings
+warnings.filterwarnings("ignore")
 
 '''CONTROLS'''
-rl_model = 'RBC_random_stochastic.pt' 
-grid_model = 'Grid_data_stoch_dev10pct.pkl'
+rl_model = 'SGM_random_deterministic.pt' 
+grid_model = 'Grid_SGM_deterministic.pkl'
+#folder to store plots 
+folder = 'SGM_plots/'
 
-run_simulation = "no" #if yes it runs the simulation
+run_simulation = "yes" #if yes it runs the simulation
 if run_simulation == "yes":
     T = 500
     dev = 5 #Pct initial deviation from steady state
@@ -26,12 +30,12 @@ if run_simulation == "yes":
     run_foc = "yes" # if yes it runs the focs of the model
     n = 200 # number of periods to compute the steady state of the simulation
 
-run_policy = "no" # if yes it runs the policy evaluation
+run_policy = "yes" # if yes it runs the policy evaluation
 if run_policy == "yes":
     dev = 5
     N = 500
 
-run_policy_sto = "yes"
+run_policy_sto = "no"
 if run_policy_sto == "yes": 
     dev = 5 
     N = 500
@@ -41,18 +45,15 @@ run_add_analysis = "no" # if yes it runs some other stuff
 
 
 '''LOADING MODELS'''
-# Loading model steady state
+'''SETTING PARAMETERS''' 
 ss = steady()
-c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
-
-# Loading RL policy
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 ''' ARCHITECTURE '''
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-4, type=float)
+parser.add_argument('--policy_var', default=-3.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)
@@ -64,17 +65,23 @@ parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
 device = torch.device('cpu')
 ''' Define Simulator'''
+#c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
+
 action_bounds = {
     'order': [1, 0],
     ''
     'min': [lambda: 0,
             lambda: 0],
-    'max': [lambda s0, s1, alpha, a1: s0 * (s1**alpha * a1**(1-alpha)),
+    'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
             lambda s0, s1, alpha, a1: 1.0]
     }
+
+
 ''' Define Model'''
 architecture_params = {'n_layers': args.n_layers,
                        'n_neurons': args.n_neurons,
@@ -105,19 +112,19 @@ grid_model_path = 'saved_models/' + grid_model
 with open(grid_model_path, 'rb') as f:
     loaded_data = pickle.load(f)
 
-zgrid = ss.tauchenhussey(N=ss.nbz)[0]   # Discretized z values
-Pi = ss.tauchenhussey(N=ss.nbz)[1]      # Transition probabilities
+#zgrid = ss.tauchenhussey(N=ss.nbz)[0]   # Discretized z values
+#Pi = ss.tauchenhussey(N=ss.nbz)[1]      # Transition probabilities
 
 k = loaded_data['st']
 k1_star = loaded_data['k1_star']
-n_star = loaded_data['n_star']
-c_star = loaded_data['c_star']
+a_star = loaded_data['a_star']
 value_star = loaded_data['value_star']
-
-optimal_kp = interp(k, k1_star)
-optimal_n = interp(k, n_star)
-optimal_c = interp(k, c_star)
+optimal_k1 = interp(k, k1_star)
+optimal_a = interp(k, a_star)
 optimal_v = interp(k, value_star)
+@np.vectorize
+def optimal_c(k): 
+    return float((1 - optimal_a(k)) * (k**ss.alpha)) 
 
 ''' Old grid solution 
 kgrid = loaded_data['kgrid']
@@ -132,69 +139,73 @@ optimal_v = interp1d(kgrid, v_star, kind="slinear", bounds_error=False, fill_val
 
 ''' SIMULATION '''
 if run_simulation == "yes":
-    k = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    st = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
     z = 1 #we want the same series for productivity in the two economies
-    z_psx = int(np.where(zgrid == 1)[0])
+    #z_psx = int(np.where(zgrid == 1)[0])
     grid_sim={}
     rl_sim={}
     grid_v = 0
     rl_v = 0
-    labour_gap = np.zeros((T-1, 2))
+    #labour_gap = np.zeros((T-1, 2))
     euler_gap = np.zeros((T-1, 2))
     
 
     for t in range(T):
         #RL 
-        st = np.array([z, k[0]])
-        state = torch.from_numpy(st).float().to(device)
+        k_rl = st[0]
+        state = torch.from_numpy(np.array([z, k_rl])).float().to(device)
         with torch.no_grad():
             action_tensor, _ = agent.get_action(state, test=True)
-            action_rl = action_tensor.squeeze().numpy()
-        st1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
-        u_rl = ss.gamma*np.log(action_rl[0]) + ss.psi*np.log(1-action_rl[1])
+            sratio_rl = action_tensor.squeeze().numpy()
+        y_rl = z* (k_rl**ss.alpha)
+        c_rl = y_rl * (1-sratio_rl)
+        u_rl = ss.gamma*np.log(c_rl)
+        k1_rl = (1 - ss.delta)*k_rl + y_rl - c_rl
+        #st1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+        #u_rl = ss.gamma*np.log(action_rl[0]) + ss.psi*np.log(1-action_rl[1])
         rl_v += ss.beta**t * u_rl
-        rl_sim[t] = {'st': st,
-                    'a': action_rl,
+        rl_sim[t] = {'k': k_rl,
+                    'c': c_rl,
+                    'y': y_rl,
                     'u': u_rl,
-                    'st1': st1_rl}
-        if run_foc == "yes":
-            if t>0:
-                l_gap, e_gap = ss.foc_log(rl_sim[t-1]['a'][0], rl_sim[t]['a'][0], 
-                                        rl_sim[t-1]['a'][1], rl_sim[t]['a'][1], 
-                                        rl_sim[t-1]['st'][0], 
-                                        rl_sim[t-1]['st'][1], rl_sim[t]['st'][1])
-                labour_gap[t-1,0] = l_gap
-                euler_gap[t-1,0] = e_gap
+                    'st1': k1_rl}
 
         #Grid 
-        #a = np.array([optimal_c(k[1]), optimal_n(k[1])])
         # Find the position of the value 1 in zgrid
-        a = np.array([ss.get_consumption(k[1], 1, float(optimal_n(k[1])[z_psx])), float(optimal_n(k[1])[z_psx])])
-        u = ss.gamma*np.log(a[0]) + ss.psi*np.log(1-a[1])
-        grid_v += ss.beta**t * u
-        kp_grid = optimal_kp(k[1])[z_psx]
-        grid_sim[t] = {'st': np.array([1, k[1]]),
-                    'a': a,
-                    'u': u,
-                    'st1': kp_grid}
+        #a = np.array([ss.get_consumption(k[1], 1, float(optimal_n(k[1])[z_psx])), float(optimal_n(k[1])[z_psx])])
+        k_grid = st[1]
+        y_grid = z* (k_grid**ss.alpha)
+        c_grid = float(optimal_c(k_grid))
+        u_grid = ss.gamma*np.log(c_grid) #+ ss.psi*np.log(1-a[1])
+        k1_grid = float(optimal_k1(k_grid))
+        grid_v += ss.beta**t * u_grid
+        grid_sim[t] = {'k': k_grid,
+                    'c': c_grid,
+                    'y': y_grid,
+                    'u': u_grid,
+                    'st1': k1_grid}
+        
+
         if run_foc == "yes":
             if t>0:
-                l_gap, e_gap = ss.foc_log(grid_sim[t-1]['a'][0], grid_sim[t]['a'][0], 
-                                        grid_sim[t-1]['a'][1], grid_sim[t]['a'][1], 
-                                        grid_sim[t-1]['st'][0], 
-                                        grid_sim[t-1]['st'][1], grid_sim[t]['st'][1])
-                labour_gap[t-1, 1] = l_gap
-                euler_gap[t-1, 1] = e_gap
+                e_gap_grid = ss.foc_log(grid_sim[t-1]['c'], grid_sim[t]['c'],  
+                                        z, grid_sim[t]['k'])
+                
+                e_gap_rl = ss.foc_log(rl_sim[t-1]['c'], rl_sim[t]['c'],  
+                                        z, rl_sim[t]['k'])
+                #labour_gap[t-1, 1] = l_gap
+                euler_gap[t-1, 0] = e_gap_rl
+                euler_gap[t-1, 1] = e_gap_grid
 
-        k = np.array([st1_rl, float(kp_grid)])
-        z1_psx = int(np.random.choice(ss.nbz, p=Pi[z_psx,:]))
-        z_psx = z1_psx
-        z = zgrid[z_psx]
+        st = np.array([k1_rl, k1_grid])
+        #z1_psx = int(np.random.choice(ss.nbz, p=Pi[z_psx,:]))
+        #z_psx = z1_psx
+        #z = zgrid[z_psx]
 
     #Plotting
     #capital
-    k_grid = [entry['st'][1] for entry in grid_sim.values()]
-    k_rl = [entry['st'][1] for entry in rl_sim.values()]
+    k_grid = [entry['k'] for entry in grid_sim.values()]
+    k_rl = [entry['k'] for entry in rl_sim.values()]
 
     #distance from steady state
     rl_ss = np.mean(k_rl[-n:])
@@ -218,12 +229,12 @@ if run_simulation == "yes":
 
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_capital.png')
+    plot_path = folder + rl_model.replace('.pt', '_capital.png')
     fig.savefig(plot_path)
 
     #consumption
-    c_grid = [entry['a'][0] for entry in grid_sim.values()]
-    c_rl = [entry['a'][0] for entry in rl_sim.values()]
+    c_grid = [entry['c'] for entry in grid_sim.values()]
+    c_rl = [entry['c'] for entry in rl_sim.values()]
 
     #distance from steady state
     rl_ss = np.mean(c_rl[-n:])
@@ -247,10 +258,10 @@ if run_simulation == "yes":
 
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_consumption.png')
+    plot_path = folder + rl_model.replace('.pt', '_consumption.png')
     fig.savefig(plot_path)
 
-    #labour
+    """ #labour
     n_grid = [entry['a'][1] for entry in grid_sim.values()]
     n_rl = [entry['a'][1] for entry in rl_sim.values()]
 
@@ -277,10 +288,10 @@ if run_simulation == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = 'plots/' + rl_model.replace('.pt', '_labour.png')
-    fig.savefig(plot_path)
+    fig.savefig(plot_path) """
 
     if run_foc == "yes":
-        #labour supply foc
+        """ #labour supply foc
         fig, ax = plt.subplots(figsize=(5, 6))  
         ax.plot(labour_gap[:, 0], color='#F08080', linewidth=1.0, alpha = 0.35,  label='RL')
         ax.plot(labour_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
@@ -306,7 +317,7 @@ if run_simulation == "yes":
         fig.autofmt_xdate() 
         plt.tight_layout()
         plot_path = 'plots/' + rl_model.replace('.pt', '_lab_supply_foc.png')
-        fig.savefig(plot_path)
+        fig.savefig(plot_path) """
 
         #euler foc
         fig, ax = plt.subplots(figsize=(5, 6))  
@@ -332,12 +343,12 @@ if run_simulation == "yes":
 
         fig.autofmt_xdate() 
         plt.tight_layout()
-        plot_path = 'plots/' + rl_model.replace('.pt', '_euler_foc.png')
+        plot_path = folder + rl_model.replace('.pt', '_euler_foc.png')
         fig.savefig(plot_path)
 
-    vss = ss.ss_value(T)
-    print(f"Steady state value = {vss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
-    print(f"Pct welfare gain of RL to grid:{-(rl_v - grid_v)*100/(grid_v)}") # if positive v_rl > v_grid
+    #vss = ss.ss_value(T)
+    print(f"Steady state value = {v_ss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
+    print(f"Pct welfare gain of RL to grid:{(rl_v - grid_v)*100/(grid_v)}") 
 
 
 
@@ -349,7 +360,7 @@ if run_policy == "yes":
     k1_values = np.zeros((N, 2))
     v_values = np.zeros((N, 2))
     k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
-    z_psx = int(np.where(zgrid == 1)[0])
+    #z_psx = int(np.where(zgrid == 1)[0])
     for i in range(len(k_values)):
         #RL 
         st = np.array([1, k_values[i]])
@@ -359,18 +370,26 @@ if run_policy == "yes":
             action_rl = action_tensor.squeeze().numpy()
             value_tensor = agent.get_value(state)
             value_rl = value_tensor.numpy()
-        c_rl = action_rl[0]
-        n_rl = action_rl[1]
-        k1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+        y_rl = (k_values[i]**ss.alpha)
+        c_rl = (1 - action_rl) * y_rl
+        k1_rl = (1 - ss.delta)*k_values[i] + action_rl * y_rl
         v_rl = float(value_rl)
+        #c_rl = action_rl[0]
+        #n_rl = action_rl[1]
+        #k1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
+        #v_rl = float(value_rl)
+
         #Grid 
-        n_grid = optimal_n(k_values[i])[z_psx]
+        """ n_grid = optimal_n(k_values[i])[z_psx]
         c_grid = optimal_c(k_values[i])[z_psx]
         k1_grid = optimal_kp(k_values[i])[z_psx]
-        v_grid = optimal_v(k_values[i])[z_psx]
+        v_grid = optimal_v(k_values[i])[z_psx] """
+        c_grid = float(optimal_c(k_values[i]))
+        k1_grid = float(optimal_k1(k_values[i]))
+        v_grid = float(optimal_v(k_values[i]))
         #save 
         c_values[i] = [c_rl, c_grid]
-        n_values[i] = [n_rl, n_grid]
+        #n_values[i] = [n_rl, n_grid]
         k1_values[i] = [k1_rl, k1_grid]
         v_values[i] = [v_rl, v_grid]
 
@@ -378,9 +397,9 @@ if run_policy == "yes":
     p = len(k_values)-1
     k_diff = (k_values[p] - k_ss) / np.abs(k_ss)
     c_diff = (c_values[p, 0] - c_values[p, 1]) / np.abs(c_values[p, 1])
-    n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
+    #n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
     print(f"Consumption deviation from grid policy for a {k_diff *100}% k deviation: {c_diff*100:.2f}%")
-    print(f"Labour deviation from grid policy for a {k_diff *100}% k deviation: {n_diff*100:.2f}%")
+    #print(f"Labour deviation from grid policy for a {k_diff *100}% k deviation: {n_diff*100:.2f}%")
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
@@ -399,10 +418,10 @@ if run_policy == "yes":
     
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_cons_rule.png')
+    plot_path = folder + rl_model.replace('.pt', '_cons_rule.png')
     fig.savefig(plot_path)
 
-    #labour
+    """ #labour
     fig, ax = plt.subplots(figsize=(5, 6))
     ax.plot(k_values, n_values[:, 0], color='crimson', linewidth=1.5, label='RL')
     ax.plot(k_values, n_values[:, 1], color='blue', linewidth=1.5, label='Grid')
@@ -420,7 +439,7 @@ if run_policy == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = 'plots/' + rl_model.replace('.pt', '_lab_rule.png')
-    fig.savefig(plot_path)
+    fig.savefig(plot_path) """
 
     #capital
     fig, ax = plt.subplots(figsize=(5, 6))
@@ -439,7 +458,7 @@ if run_policy == "yes":
 
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_saving_rule.png')
+    plot_path = folder + rl_model.replace('.pt', '_saving_rule.png')
     fig.savefig(plot_path)
 
     #value function
@@ -464,7 +483,7 @@ if run_policy == "yes":
 
 
 
-'''POLICY EVALUATION STOCHASTIC'''
+""" '''POLICY EVALUATION STOCHASTIC'''
 if run_policy_sto == "yes":
     c_values_rl = np.zeros((N, ss.nbz))
     c_values_grid = np.zeros((N, ss.nbz))
@@ -650,3 +669,4 @@ if run_add_analysis == 1:
     plt.title("DeltL vs DeltC") 
     plt.show() 
 
+ """
