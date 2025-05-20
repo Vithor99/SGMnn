@@ -3,25 +3,36 @@ import matplotlib.pyplot as plt
 import gymnasium as gym
 from gymnasium import spaces
 import warnings
-
+from steady import steady
 
 class Model(gym.Env):
 
     def __init__(self, k=0, var_k=0, gamma=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
         super().__init__()
 
-        self.observation_space = spaces.Box(
+        """ self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
         )
         self.action_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
         )
         self.state = np.zeros(2)
+        self.time = 0 """
+
+        #self.ss = steady()
+        #self.c_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
+
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(2, ), dtype=np.float32
+        )
+        self.action_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(1, ), dtype=np.float32
+        )
+        self.state = np.zeros(2)
         self.time = 0
 
         self.T = T
         self.gamma = gamma #consumption pref
-        #self.psi = psi
         self.delta = delta #depreciation rate
         self.rhoa = rhoa #AR coff 
         self.alpha = alpha #prduction function
@@ -46,30 +57,24 @@ class Model(gym.Env):
 
     def step(self, action):
 
-        #rescale magnitueds coming from NN
         z = self.state[0]
         k = self.state[1]
         s_ratio = action
-        #c = action[0]
-        #n = action[1]
-
-        #compute Penalty / reward
-        #y = z* (k**self.alpha) * (n**(1-self.alpha))
         y = z* (k**self.alpha)
         y = np.nan_to_num(y, nan=0.0)
         c = y * (1-s_ratio)
 
         if  c < 0  or y-c < 0:
-            U = self.gamma*np.log(c)#+self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c                      #updates Capital level
-            values = c/y                                       #debugging
-            warnings.warn(f"Bounds are not working: {values}") #debugging
+            U = self.gamma*np.log(c)
+            k1 = (1-self.delta)*k + y - c                      
+            values = c/y                                       
+            warnings.warn(f"Bounds are not working: {values}") 
         else:
-            U = self.gamma*np.log(c) #+ self.psi*np.log(1-n)
-            k1 = (1-self.delta)*k + y - c  # updates Capital level
+            U = self.gamma*np.log(c) 
+            k1 = (1-self.delta)*k + y - c  
 
         if self.version =="deterministic":
-            z1 = (1-self.rhoa) + self.rhoa*z  # updates tech.lvl
+            z1 = (1-self.rhoa) + self.rhoa*z  
         else:
             z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)
 
@@ -80,7 +85,7 @@ class Model(gym.Env):
 
         done = False
         if self.time >= self.T:
-            done = True
+            done = True 
 
         return new_state, U, done, False, {'y': y, 'c': c}
 

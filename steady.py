@@ -6,27 +6,17 @@ class steady:
     def __init__(self):
         self.beta = 0.99
         self.gamma = 1 #consumption pref
-        #self.psi = 1.6
         self.delta = 0.025 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
         self.var_eps_z = 0.001 #variance of TFP shock 
         self.states = 2 
         self.actions = 1
-
-    """ def get_consumption(self, k, z, n):
-        c = (self.gamma/self.psi)*(1-n)*z*(1-self.alpha)*((k/n)**self.alpha)
-        return c """
+        self.nbz = 11 #dimension of the quadrature
     
     def equations(self, vars):
         c, k = vars
-
-        #ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(np.sqrt(c)/np.sqrt(1-n))
-        #ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(c/(1-n))
-        
-        #ee = 1 - self.beta*((1-self.delta)+self.alpha*k**(self.alpha-1)*n**(1-self.alpha))
         ee = 1 - self.beta*((1-self.delta)+self.alpha*k**(self.alpha-1))  
-        #kt = self.delta*k - k**self.alpha * n**(1-self.alpha) + c
         kt = self.delta*k - k**self.alpha + c 
         return [ee, kt]
     
@@ -34,18 +24,12 @@ class steady:
         initial_guess = [0.5, 0.5]
         solution = fsolve(self.equations, initial_guess)
         c_ss, k_ss = solution
-        #y_ss = (k_ss)**self.alpha * (n_ss)**(1-self.alpha)
         y_ss = (k_ss)**self.alpha
-
-        #u_ss = self.gamma*np.sqrt(c_ss)+self.psi*np.sqrt(1-n_ss)
-        #u_ss = self.gamma*np.log(c_ss)+self.psi*np.log(1-n_ss)
         u_ss = self.gamma*np.log(c_ss)
-
         v_ss = (1/(1-self.beta))*u_ss
         
         return c_ss, k_ss, y_ss, u_ss, v_ss 
     
-        #include a function that computes the value with the number of periods as input 
     def ss_value(self, T):
         u_ss = self.ss()[-1]
         v_ss = 0
@@ -55,57 +39,43 @@ class steady:
         return v_ss 
     
     def foc_log(self, c0, c1, z0, k1):
-        #ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(c/(1-n))
-        #ee = (self.gamma/c) - self.beta*(self.gamma/c1)*((1-self.delta)+self.alpha*k1**(self.alpha-1)*n1**(1-self.alpha))
         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-        #c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
-        #c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
         c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) )
         c_ratio = c1/c0
-        #labor_gap = np.abs((c0 - c0_star)/c0_star)
         euler_gap = np.abs((c_ratio - c_ratio_star)/c_ratio_star)
         return euler_gap
-    
-    """ def foc_sqrt(self, c, c1, n, n1, k, k1):
-        ls = (1-self.alpha)*(k**self.alpha)*(n**(-self.alpha)) - (self.psi/self.gamma)*(np.sqrt(c)/np.sqrt(1-n))
-        ee = (self.gamma/np.sqrt(c)) - self.beta*(self.gamma/np.sqrt(c1))*((1-self.delta)+self.alpha*k1**(self.alpha-1)*n1**(1-self.alpha)) 
-        return ls, ee """
 
-    """ def get_random_policy_utility(self, last_sim, T): #we can eliminate? 
-        upper_bound_1 = 1.0
-        upper_bound_0 = lambda s0, s1, alpha, a1: s0 * (s1**alpha * a1**(1-alpha))
-
-        #st, _ = sim.reset()
-        st = np.array([1, last_sim[0]['st'][1]])
-        z = [v['st1'][0] for v in last_sim.values()]
-        random_util = 0
-
-        for t in range(T):
-            rnd_a_1 = np.random.uniform(0.0, upper_bound_1)
-            rnd_a_0 = np.random.uniform(0.0, upper_bound_0(st[0], st[1], self.alpha, rnd_a_1))
-            a = np.array([rnd_a_0, rnd_a_1])
-
-            y = st[0]*(st[1]**self.alpha) * (rnd_a_1**(1-self.alpha))
-            u = self.gamma*np.log(rnd_a_0)+self.psi*np.log(1-rnd_a_1)
-            k1 =  (1-self.delta)*st[1] + y - rnd_a_0
-            st = np.array([z[t], k1])
-            #st, u, done, _, y = sim.step(a)
-            random_util += (self.beta ** t) * u
-
-        return random_util """
-    
     def get_random_util(self, z, k):
-        #upper_bound_1 = 1.0
-        #upper_bound_0 = lambda s0, s1, alpha, a1: s0 * (s1**alpha * a1**(1-alpha))
-        #rnd_a_1 = np.random.uniform(0.0, upper_bound_1)
-        #rnd_a_0 = np.random.uniform(0.0, upper_bound_0(z, k, self.alpha, rnd_a_1))
         rnd_a = np.random.uniform(0.0, 1.0)
-        #y = z*(k**self.alpha) * (rnd_a_1**(1-self.alpha))
         y = z*(k**self.alpha)
-
-        U = self.gamma*np.log(rnd_a) #+self.psi*np.log(1-rnd_a_1)
+        U = self.gamma*np.log(rnd_a) 
         k1 = (1-self.delta)*k + y - rnd_a
         return U, k1
+    
+    def tauchenhussey(self, N):
+        x0, w0 = self.gausshermite(N)
+        tau = np.zeros(N)
+        for i in range(N):
+            tau_i = 0
+            for j in range(N):
+                tau_i += w0[j] * np.exp(x0[j]**2 - (x0[j] - self.rhoa * x0[i])**2 ) 
+            tau[i] = (1/np.sqrt(np.pi)) * tau_i 
+        
+        Pi = np.zeros((N, N)) #transition matrix
+        for i in range(N):
+            for j in range(N):
+                Pi[i, j] = ((1/np.sqrt(np.pi)) * w0[j] * np.exp(x0[j]**2 - (x0[j] - self.rhoa * x0[i])**2 ))/tau[i]
+        
+        Z = np.zeros(N) #grid
+        for i in range(N): 
+            Z[i] = self.var_eps_z * np.sqrt(2) * x0[i] + 1 #mean = 1, std = var_eps_z
+
+        return Z, Pi 
+    
+    def gausshermite(self, n):
+        x0, w0 = np.polynomial.hermite.hermgauss(n)
+        return x0, w0
+    
 
     
 ss = steady()

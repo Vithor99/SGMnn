@@ -19,18 +19,15 @@ class ActorCritic(nn.Module):
         self.gamma = gamma
         self.batch_size = batch_size
         self.device = device
-
         self.batchdata = BatchData()
 
         # self.replay_buffer = Memory(2000)
         self.value_net = ValueNetwork(input_dim, architecture_params, 1)
         self.policy_net = StochasticPolicyNetwork(input_dim, architecture_params, output_dim, alpha=alpha, learn_std=learn_std)
-
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr)
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
         self.ss = steady()
-        #self.c_ss, self.n_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
         self.c_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
     
     def get_value(self, st):
@@ -41,25 +38,15 @@ class ActorCritic(nn.Module):
         a = self.policy_net.get_action(st, test=test)
         if np.random.rand() < self.epsilon and not test:
             a = torch.rand((st.shape[0], 1))*0.15
+
         return a
     
     def get_dist(self, st): 
-        #sample0, sample1 = self.policy_net.get_dist(st)
         sample0 = self.policy_net.get_dist(st)
 
         return sample0
 
     def update(self):
-
-        # if len(self.replay_buffer) < 1000: #training starts after the first model simulation
-        #     return None, None
-
-        # states = torch.cat([x.view(1, -1) for x in self.batchdata.st], 0)
-        # next_states = torch.cat([x.view(1, -1) for x in self.batchdata.st1], 0)
-        # rewards = torch.cat([x.view(1) for x in self.batchdata.u], 0)
-        # actions = torch.cat([x.view(1, -1) for x in self.batchdata.a], 0)
-        # terminal = torch.tensor([x for x in self.batchdata.terminal])
-
         states = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.st], 0)).float().to(self.device)
         next_states = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.st1], 0)).float().to(self.device)
         rewards = torch.from_numpy(np.concatenate([np.expand_dims(x, 0) for x in self.batchdata.u], 0)).float().to(self.device)
@@ -96,7 +83,6 @@ class ActorCritic(nn.Module):
         loss_V.backward()
         # torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 0.5)
         self.optimizer_v.step()
-
         self.optimizer_pi.zero_grad()
         policy_loss.backward()
         # torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
@@ -113,19 +99,7 @@ class ActorCritic(nn.Module):
         self.load_state_dict(torch.load("saved_models/" + file_name + ".pt"))
 
     def plot_adv(self, At, actions): 
-        """ plt.clf()
-        plt.subplot(2, 1, 1)
-        plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
-        plt.xlim( 0, 1.5)
-        plt.axvline(self.c_ss, color='r', linestyle='--', label='c')
-
-        plt.subplot(2, 1, 2)
-        plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='cons ratio')
-        plt.xlim( 0, 1)
-        plt.axvline(self.n_ss, color='r', linestyle='--', label='c') """
-
         plt.clf()
-        #plt.subplot(2, 1, 1)
         plt.scatter(actions.cpu().numpy(), At.cpu().numpy(), alpha=0.6, label='cons ratio')
         plt.xlim( 0, 1.0)
         plt.axvline(self.c_ss, color='r', linestyle='--', label='c/y')
