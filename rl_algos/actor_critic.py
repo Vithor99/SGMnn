@@ -13,9 +13,8 @@ from steady import steady
 
 class ActorCritic(nn.Module):
 
-    def __init__(self, input_dim=2, architecture_params=None, output_dim=2, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
+    def __init__(self, input_dim=2, architecture_params=None, output_dim=1, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
         super(ActorCritic, self).__init__()
-
         self.epsilon = epsilon
         self.gamma = gamma
         self.batch_size = batch_size
@@ -31,7 +30,8 @@ class ActorCritic(nn.Module):
         self.optimizer_pi = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
         self.ss = steady()
-        self.c_ss, self.n_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
+        #self.c_ss, self.n_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
+        self.c_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
     
     def get_value(self, st):
         v = self.value_net(st).squeeze()
@@ -40,12 +40,14 @@ class ActorCritic(nn.Module):
     def get_action(self, st, test=False):
         a = self.policy_net.get_action(st, test=test)
         if np.random.rand() < self.epsilon and not test:
-            a = torch.rand((st.shape[0], 2))*0.15
+            a = torch.rand((st.shape[0], 1))*0.15
         return a
     
     def get_dist(self, st): 
-        sample0, sample1 = self.policy_net.get_dist(st)
-        return sample0, sample1
+        #sample0, sample1 = self.policy_net.get_dist(st)
+        sample0 = self.policy_net.get_dist(st)
+
+        return sample0
 
     def update(self):
 
@@ -111,7 +113,7 @@ class ActorCritic(nn.Module):
         self.load_state_dict(torch.load("saved_models/" + file_name + ".pt"))
 
     def plot_adv(self, At, actions): 
-        plt.clf()
+        """ plt.clf()
         plt.subplot(2, 1, 1)
         plt.scatter(actions.cpu().numpy()[:,0], At.cpu().numpy(), alpha=0.6, label='cons ratio')
         plt.xlim( 0, 1.5)
@@ -120,7 +122,13 @@ class ActorCritic(nn.Module):
         plt.subplot(2, 1, 2)
         plt.scatter(actions.cpu().numpy()[:,1], At.cpu().numpy(), alpha=0.6, label='cons ratio')
         plt.xlim( 0, 1)
-        plt.axvline(self.n_ss, color='r', linestyle='--', label='c')
+        plt.axvline(self.n_ss, color='r', linestyle='--', label='c') """
+
+        plt.clf()
+        #plt.subplot(2, 1, 1)
+        plt.scatter(actions.cpu().numpy(), At.cpu().numpy(), alpha=0.6, label='cons ratio')
+        plt.xlim( 0, 1.0)
+        plt.axvline(self.c_ss, color='r', linestyle='--', label='c/y')
 
         plt.show() 
 

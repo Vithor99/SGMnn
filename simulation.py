@@ -7,7 +7,7 @@ import warnings
 
 class Model(gym.Env):
 
-    def __init__(self, k=0, var_k=0, gamma=0, psi=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
+    def __init__(self, k=0, var_k=0, gamma=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
         super().__init__()
 
         self.observation_space = spaces.Box(
@@ -21,7 +21,7 @@ class Model(gym.Env):
 
         self.T = T
         self.gamma = gamma #consumption pref
-        self.psi = psi
+        #self.psi = psi
         self.delta = delta #depreciation rate
         self.rhoa = rhoa #AR coff 
         self.alpha = alpha #prduction function
@@ -49,20 +49,23 @@ class Model(gym.Env):
         #rescale magnitueds coming from NN
         z = self.state[0]
         k = self.state[1]
-        c = action[0]
-        n = action[1]
+        s_ratio = action
+        #c = action[0]
+        #n = action[1]
 
         #compute Penalty / reward
-        y = z* (k**self.alpha) * (n**(1-self.alpha))
+        #y = z* (k**self.alpha) * (n**(1-self.alpha))
+        y = z* (k**self.alpha)
         y = np.nan_to_num(y, nan=0.0)
+        c = y * (1-s_ratio)
 
-        if (1-n) < 0 or c < 0 or n < 0 or y-c < 0:
-            U = self.gamma*np.log(c)+self.psi*np.log(1-n)
+        if  c < 0  or y-c < 0:
+            U = self.gamma*np.log(c)#+self.psi*np.log(1-n)
             k1 = (1-self.delta)*k + y - c                      #updates Capital level
             values = c/y                                       #debugging
             warnings.warn(f"Bounds are not working: {values}") #debugging
         else:
-            U = self.gamma*np.log(c) + self.psi*np.log(1-n)
+            U = self.gamma*np.log(c) #+ self.psi*np.log(1-n)
             k1 = (1-self.delta)*k + y - c  # updates Capital level
 
         if self.version =="deterministic":

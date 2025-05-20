@@ -65,7 +65,7 @@ model_type = initial_k + "_" + version
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + "_debugfin_main_"
+        name_exp += str(k) + "=" + str(v) + "_GrowthModel_"
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
@@ -76,7 +76,9 @@ name_exp += str(sim_length)
 writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
-c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+#c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
@@ -117,7 +119,7 @@ register(
     kwargs={'k': k_ss,
             'var_k': var_k0/100,
             'gamma': ss.gamma,
-            'psi': ss.psi,
+            #'psi': ss.psi,
             'delta': ss.delta,
             'rhoa': ss.rhoa,
             'alpha': ss.alpha,
@@ -170,7 +172,7 @@ for iter in tqdm(range(EPOCHS)):
             total_utility += np.mean((agent.gamma ** t) * u)
 
 
-    writer.add_scalar("pct welfare gain of steady state to current policy (train)", (-(vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
+    writer.add_scalar("pct welfare gain of steady state to current policy (train)", ((vss_train-total_utility)/total_utility)*100 , iter) # % of additional utility in steady state  
 
     # qua alleniamo NN
     if iter % frq_train == (frq_train-1):
@@ -191,15 +193,17 @@ for iter in tqdm(range(EPOCHS)):
 
         total_utility = 0
         euler_gap = 0
-        labor_gap = 0
+        #labor_gap = 0
         last_state = 0
         last_cons = 0 
-        last_lab =  0
+        #last_lab =  0
         random_util = 0
 
         for _ in range(n_eval):
             last_sim = {}
-            all_actions = np.zeros((T_test, 2))
+            #all_actions = np.zeros((T_test, 2))
+            all_actions = np.zeros((T_test, ss.actions))
+
 
 
             st, _ = test_sim.reset(options=initial_k) 
@@ -232,7 +236,7 @@ for iter in tqdm(range(EPOCHS)):
 
                     #distance from FOC
                     if t>0:
-                        k0 = last_sim[t-1]['st'][1]
+                        #k0 = last_sim[t-1]['st'][1]
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
                         E_z1 = (1-ss.rhoa) + ss.rhoa * z0
@@ -240,19 +244,20 @@ for iter in tqdm(range(EPOCHS)):
                         #c1 = all_actions[t,0]
                         c0 = last_sim[t-1]['c']
                         c1 = last_sim[t]['c']
-                        n0 = all_actions[t-1,1]
-                        n1 = all_actions[t,1]
-                        c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
-                        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
+                        #n0 = all_actions[t-1,1]
+                        #n1 = all_actions[t,1]
+                        #c0_star = (ss.gamma/ss.psi)*(1-n0)*z0*(1-ss.alpha)*((k0/n0)**ss.alpha)
+                        #c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) * ((n1)**(1-ss.alpha)))
+                        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) )
                         c_ratio = c1/c0
-                        labor_gap += np.abs((c0 - c0_star)/c0_star)
+                        #labor_gap += np.abs((c0 - c0_star)/c0_star)
                         euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
                     
                     #final distance from ss
                     if t==T_test-1:
                         last_state += st1[1]
                         last_cons += last_sim[t]['c']
-                        last_lab += all_actions[t, 1]
+                        #last_lab += all_actions[t, 1]
 
                     
                     st = st1
@@ -264,21 +269,21 @@ for iter in tqdm(range(EPOCHS)):
 
         total_utility /= n_eval
         euler_gap /= n_eval*T_test
-        labor_gap /= n_eval*T_test
+        #labor_gap /= n_eval*T_test
         last_state /= n_eval
         last_cons /= n_eval 
-        last_lab /= n_eval
+        #last_lab /= n_eval
         random_util /= n_eval
 
         writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
-        writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap*100, iter)
-        writer.add_scalar("pct welfare gain of steady state to current policy (test)", (-(vss_test-total_utility)/total_utility)*100 , iter)
-        writer.add_scalar("pct welfare gain of current policy to random policy", (-(total_utility-random_util)/random_util)*100 , iter) 
+        #writer.add_scalar("pct distance from opt consumption (lab supply)", labor_gap*100, iter)
+        writer.add_scalar("pct welfare gain of steady state to current policy (test)", ((vss_test-total_utility)/total_utility)*100 , iter)
+        writer.add_scalar("pct welfare gain of current policy to random policy", ((total_utility-random_util)/random_util)*100 , iter) 
         writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
         writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
-        writer.add_scalar("pct distance of n to n_ss", (np.abs(last_lab - n_ss)/n_ss)*100, iter)
+        #writer.add_scalar("pct distance of n to n_ss", (np.abs(last_lab - n_ss)/n_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
-        writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
+        #writer.add_scalar("var action 1 per sim", np.var(all_actions[:, 1]), iter)
 
   
         if best_utility < total_utility:
@@ -287,7 +292,7 @@ for iter in tqdm(range(EPOCHS)):
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
 
-            agent.save("RBC_"+ str(model_type))
+            agent.save("SGM_"+ str(model_type))
 
     if plot_histogram == 1: 
         if iter % 12 == 12-1:
@@ -297,24 +302,25 @@ for iter in tqdm(range(EPOCHS)):
 
             st_tensor = torch.from_numpy(st).float().to(device)
             with torch.no_grad():
-                sample0, sample1 = agent.get_dist(st_tensor)
+                #sample0, sample1 = agent.get_dist(st_tensor)
+                sample0 = agent.get_dist(st_tensor)
 
                 # Create a figure with two subplots
                 plt.subplot(2, 1, 1)
                 plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
-                plt.axvline(c_ss, color='r', linestyle='--', label='c')
-                plt.title("Histogram of c")
+                plt.axvline(c_ss/y_ss, color='r', linestyle='--', label='c')
+                plt.title("Histogram of c/y")
                 plt.xlabel("Value")
                 plt.ylabel("Density")
-                plt.xlim(0, 1.5)
+                plt.xlim(0, 1)
                 
-                plt.subplot(2, 1, 2)
+                """ plt.subplot(2, 1, 2)
                 plt.hist(sample1, bins=50, density=True, alpha=0.6, color='green')
                 plt.axvline(n_ss, color='r', linestyle='--', label='c')
                 plt.title("Histogram of n")
                 plt.xlabel("Value")
                 plt.ylabel("Density")
-                plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0])
+                plt.xlim(0 , 1) #np.max([sample.max() - n_ss, 0]) """
                 # Adjust layout and display the plots
                 plt.tight_layout()
                 plt.draw()
