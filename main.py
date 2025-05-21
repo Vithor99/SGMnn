@@ -15,7 +15,7 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
-comment = '_SGM_cleaning_'
+comment = '_SGM_'
 #working version
 version = "deterministic" # deterministic ; stochastic  
 initial_k = "random"      # steady ; random 
