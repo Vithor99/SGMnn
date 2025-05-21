@@ -2,6 +2,8 @@
 *.pyc
 *.pyo
 *.pyd
+*.out
+*.slurm
 
 # Ignore the __pycache__ directory
 __pycache__/
@@ -10,7 +12,7 @@ old_sims
 value_iteration
 plots/
 SGM_plots/
-RBCnn.code-workspace
+
 
 
 
