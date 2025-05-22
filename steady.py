@@ -4,13 +4,13 @@ from scipy.optimize import fsolve
 # %%
 class steady:
     def __init__(self):
-        self.beta = 0.97 #0.99 #0.97
+        self.beta = 0.99 #0.99 #0.97
         self.gamma = 1 #consumption pref
-        self.delta =  0.01 #0.03 #0.01 #depreciation rate
+        self.delta =  0.03 #0.03 #0.01 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
         self.var_eps_z = 0.001 #variance of TFP shock 
-        self.states = 2 
+        self.states = 4 
         self.actions = 1
         self.nbz = 11 #dimension of the quadrature
     
@@ -48,8 +48,9 @@ class steady:
     def get_random_util(self, z, k):
         rnd_a = np.random.uniform(0.0, 1.0)
         y = z*(k**self.alpha)
-        U = self.gamma*np.log(rnd_a) 
-        k1 = (1-self.delta)*k + y - rnd_a
+        c = (1 - rnd_a)*y
+        U = self.gamma*np.log(c) 
+        k1 = (1-self.delta)*k + y - c
         return U, k1
     
     def tauchenhussey(self, N):

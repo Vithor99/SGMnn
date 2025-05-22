@@ -15,15 +15,15 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
-comment = '_SGM'
+comment = 'SGM_4st_'
 #working version
 version = "deterministic" # deterministic ; stochastic  
-initial_k = "random"      # steady ; random 
+initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
-frq_test = 500 
+frq_test = 10 
 EPOCHS = 45000
 
 plot_histogram = 0 #1 plots the action dist conitional on steady state 
@@ -60,7 +60,7 @@ device = torch.device('cpu')
 name_exp = ''
 
 ## string to indicate type in logs
-model_type = initial_k + "_" + version + comment
+model_type = comment + initial_k + "_" + version 
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
@@ -76,7 +76,7 @@ writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
 c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
-
+s_ratio_ss = 1 - (c_ss/y_ss)
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
@@ -101,7 +101,9 @@ agent = ActorCritic(input_dim=state_dim,
 register(
     id="model",
     entry_point="simulation:Model",
-    kwargs={'k': k_ss,
+    kwargs={'k_ss': k_ss,
+            'c_ss': c_ss,
+            'y_ss': y_ss,
             'var_k': var_k0/100,
             'gamma': ss.gamma,
             'delta': ss.delta,
@@ -248,7 +250,7 @@ for iter in tqdm(range(EPOCHS)):
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
 
-            agent.save("SGM_"+ str(model_type))
+            agent.save(str(model_type))
 
     if plot_histogram == 1: 
         if iter % 12 == 12-1:

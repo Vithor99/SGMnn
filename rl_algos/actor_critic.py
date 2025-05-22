@@ -13,7 +13,7 @@ from steady import steady
 
 class ActorCritic(nn.Module):
 
-    def __init__(self, input_dim=2, architecture_params=None, output_dim=1, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
+    def __init__(self, input_dim=4, architecture_params=None, output_dim=1, lr=1e-3, gamma=0.99, epsilon=0.0, batch_size=128, alpha=0, learn_std=True, device=None):
         super(ActorCritic, self).__init__()
         self.epsilon = epsilon
         self.gamma = gamma
