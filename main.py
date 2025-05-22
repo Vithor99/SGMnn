@@ -15,7 +15,7 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
-comment = '_SGM_'
+comment = '_SGM'
 #working version
 version = "deterministic" # deterministic ; stochastic  
 initial_k = "random"      # steady ; random 
@@ -60,11 +60,11 @@ device = torch.device('cpu')
 name_exp = ''
 
 ## string to indicate type in logs
-model_type = initial_k + "_" + version 
+model_type = initial_k + "_" + version + comment
 sim_length = "_train="+ str(T_train) +"_test="+ str(T_test)
 for k, v in args.__dict__.items():
     if k == 'policy_var':
-        name_exp += str(k) + "=" + str(v) + comment
+        name_exp += str(k) + "=" + str(v) 
         break
 #for k, v in args.__dict__.items():
 #    name_exp += str(k) + "=" + str(v) + "_"
