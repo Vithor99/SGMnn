@@ -3,7 +3,33 @@
 tensorboard --logdir ./logs  
 
  #delete log from tensorboard
-rm -r ./logs/"name"               
+rm -r ./logs/"name"        
+
+
+#Commands useful in SSH
+sbatch main.slurm  # runs main file 
+squeue -u vreichlin # check job is running 
+tail -f main.out   # follow run time on ssh
+scancel 123456     #cancels job
+
+#TensorBoard 
+ssh -N -L 16006:localhost:6006 vreichlin@194.57.114.202 # On the local terminal 
+
+source $HOME/venvs/rbcenv/bin/activate
+tensorboard --logdir logs --host 0.0.0.0 --port 6006  # On the Cluster terminal 
+
+
+
+#To open tensorboard on the ssh 
+ssh -N -L 16006:localhost:6006 vreichlin@194.57.114.202 # On the local terminal 
+module load python
+source $HOME/venvs/rbcenv/bin/activate
+cd RBCnn
+tensorboard --logdir logs --host 0.0.0.0 --port 6006  # On the Cluster terminal 
+
+#resetting 
+ps aux | grep tensorboard                                            #shows running TB processes 
+pkill -f tensorboard                                                 #kills running TB processes 
 
 
 
