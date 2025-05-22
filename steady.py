@@ -1,12 +1,12 @@
 # This script computes the steady state of the model 
 import numpy as np
 from scipy.optimize import fsolve
-
+# %%
 class steady:
     def __init__(self):
-        self.beta = 0.99
+        self.beta = 0.97 #0.99 #0.97
         self.gamma = 1 #consumption pref
-        self.delta = 0.025 #depreciation rate
+        self.delta =  0.01 #0.03 #0.01 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
         self.var_eps_z = 0.001 #variance of TFP shock 
@@ -31,7 +31,7 @@ class steady:
         return c_ss, k_ss, y_ss, u_ss, v_ss 
     
     def ss_value(self, T):
-        u_ss = self.ss()[-1]
+        c_ss, k_ss, y_ss, u_ss, v_ss = self.ss()
         v_ss = 0
         for t in range(T):
             v_ss += (self.beta**t) * u_ss
@@ -39,8 +39,8 @@ class steady:
         return v_ss 
     
     def foc_log(self, c0, c1, z0, k1):
-        E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) )
+        E_z1 = (1-self.rhoa) + self.rhoa * z0
+        c_ratio_star = self.beta*((1 - self.delta) + E_z1 * self.alpha * ((k1)**(self.alpha-1)) )
         c_ratio = c1/c0
         euler_gap = np.abs((c_ratio - c_ratio_star)/c_ratio_star)
         return euler_gap
@@ -78,6 +78,7 @@ class steady:
     
 
     
-ss = steady()
-c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
-    
+#ss = steady()
+#c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+#r = (1/ss.beta) + ss.delta - 1
+#print(r*100)

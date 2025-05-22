@@ -4,6 +4,7 @@
 *.pyd
 *.out
 *.slurm
+*.pkl
 
 # Ignore the __pycache__ directory
 __pycache__/
@@ -12,6 +13,7 @@ old_sims
 value_iteration
 plots/
 SGM_plots/
+saved_models/
 
 
 
