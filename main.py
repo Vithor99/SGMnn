@@ -13,9 +13,9 @@ from steady import steady
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
-
+# baseline version is now: 2 states, beta = 0.97 and delta = 0.01
 '''CONTROLS'''
-comment = 'SGM_4st_'
+comment = 'SGM_'
 #working version
 version = "deterministic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
@@ -104,6 +104,7 @@ register(
     kwargs={'k_ss': k_ss,
             'c_ss': c_ss,
             'y_ss': y_ss,
+            'n_states': state_dim,
             'var_k': var_k0/100,
             'gamma': ss.gamma,
             'delta': ss.delta,

@@ -4,13 +4,14 @@ from scipy.optimize import fsolve
 # %%
 class steady:
     def __init__(self):
-        self.beta = 0.99 #0.99 #0.97
+        self.beta = 0.97   #0.99 #0.97
+        self.delta =  0.01 #0.03 #0.01 #depreciation rate
+        self.states = 2    #4
+
         self.gamma = 1 #consumption pref
-        self.delta =  0.03 #0.03 #0.01 #depreciation rate
         self.rhoa = 0.9 #AR coff 
         self.alpha = 0.35 #prduction function
         self.var_eps_z = 0.001 #variance of TFP shock 
-        self.states = 4 
         self.actions = 1
         self.nbz = 11 #dimension of the quadrature
     

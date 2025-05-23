@@ -7,16 +7,16 @@ from steady import steady
 
 class Model(gym.Env):
 
-    def __init__(self, k_ss=0, c_ss=0, y_ss = 0,  var_k=0, gamma=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
+    def __init__(self, k_ss=0, c_ss=0, y_ss = 0, n_states = 0,  var_k=0, gamma=0, delta=0, rhoa=0, alpha=0, T=0, noise=0, version=None):
         super().__init__()
 
         self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(4, ), dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(n_states, ), dtype=np.float32
         )
         self.action_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(1, ), dtype=np.float32
         )
-        self.state = np.zeros(4)
+        self.state = np.zeros(n_states)
         self.time = 0
 
         self.T = T
@@ -41,8 +41,9 @@ class Model(gym.Env):
         else:
             self.state[1] = np.random.uniform(low=self.k0*(1-self.var_k), high=self.k0*(1+self.var_k)) 
         
-        self.state[2] = self.k0
-        self.state[3] = 1 - (self.c0/self.y0)
+        if np.shape(self.state)[0] > 2:
+            self.state[2] = self.k0
+            self.state[3] = 1 - (self.c0/self.y0)
 
         obs = np.array(self.state, dtype=np.float32)
         return obs, {'y': 0}
@@ -71,7 +72,11 @@ class Model(gym.Env):
         else:
             z1 = (1-self.rhoa) + self.rhoa*z + np.random.normal(0, self.noise)
 
-        self.state = np.stack([z1, k1, k, s_ratio])
+        if np.shape(self.state)[0] > 2:
+            self.state = np.stack([z1, k1, k, s_ratio])
+        else: 
+            self.state = np.stack([z1, k1])
+
         new_state = np.array(self.state, dtype=np.float32)
 
         self.time += 1

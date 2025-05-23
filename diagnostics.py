@@ -15,9 +15,10 @@ from scipy.interpolate import CubicSpline as interp
 import warnings
 warnings.filterwarnings("ignore")
 
+# Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_random_deterministic.pt' 
-grid_model = 'Grid_SGM_deterministic.pkl'
+rl_model = 'SGM_LowB_steady_deterministic.pt' 
+grid_model = 'Grid_SGM_LowB_deterministic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
@@ -65,30 +66,16 @@ parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
 device = torch.device('cpu')
 ''' Define Simulator'''
-#c_ss, n_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
-
+s_ratio_ss = 1 - (c_ss/y_ss)
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
 
-action_bounds = {
-    'order': [1, 0],
-    ''
-    'min': [lambda: 0,
-            lambda: 0],
-    'max': [lambda s0, s1, alpha, a1: s0 * (s1**(alpha) * a1**(1-alpha)),
-            lambda s0, s1, alpha, a1: 1.0]
-    }
-
-
 ''' Define Model'''
 architecture_params = {'n_layers': args.n_layers,
                        'n_neurons': args.n_neurons,
-                       'policy_var': args.policy_var,
-                       'action_bounds': action_bounds,
-                       'use_hard_bounds': args.use_hard_bounds
-                       }
+                       'policy_var': args.policy_var}
 
 agent = ActorCritic(input_dim=state_dim,
                     architecture_params=architecture_params,

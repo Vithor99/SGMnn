@@ -18,8 +18,16 @@ ssh -N -L 16006:localhost:6006 vreichlin@194.57.114.202 # On the local terminal
 source $HOME/venvs/rbcenv/bin/activate
 tensorboard --logdir logs --host 0.0.0.0 --port 6006  # On the Cluster terminal 
 
+#sync saved_models: run on git on local terminal
+1) open MSYS2 terminal 
+2) run command: ./sync_models.sh
 
 
+
+
+
+
+######
 #To open tensorboard on the ssh 
 ssh -N -L 16006:localhost:6006 vreichlin@194.57.114.202 # On the local terminal 
 module load python
