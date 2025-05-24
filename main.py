@@ -234,9 +234,9 @@ for iter in tqdm(range(EPOCHS)):
                             with torch.no_grad():
                                 st_tensor_foc = torch.from_numpy(np.array([Z[i], k1])).float().to(device)
                                 action_tensor_foc, _ = agent.get_action(st_tensor_foc, test=True)
-                                a = action_tensor_foc.squeeze().numpy()
-                                _, _, done, _, rec_foc = test_sim.step(a)
-                                c1 = rec_foc['c']
+                                a_foc = action_tensor_foc.squeeze().numpy()
+                                y = Z[i]* (k1**ss.alpha)
+                                c1 = y * (1-a_foc)
                                 mu1[i] = 1/c1
                         r1 = (1-ss.delta) + Z * ss.alpha * (k1**(ss.alpha-1))
                         EPS = np.sum(Pi * (mu1*r1))
