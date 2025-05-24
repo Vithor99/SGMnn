@@ -23,7 +23,7 @@ var_k0 = 1                #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
-frq_test = 50 
+frq_test = 5 
 EPOCHS = 45000
 
 plot_histogram = 0 #1 plots the action dist conitional on steady state 
