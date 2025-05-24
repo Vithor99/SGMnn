@@ -17,13 +17,13 @@ from gymnasium.vector import SyncVectorEnv
 '''CONTROLS'''
 comment = 'SGM_'
 #working version
-version = "deterministic" # deterministic ; stochastic  
+version = "stochastic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
-frq_test = 10 
+frq_test = 50 
 EPOCHS = 45000
 
 plot_histogram = 0 #1 plots the action dist conitional on steady state 
@@ -110,8 +110,8 @@ register(
             'delta': ss.delta,
             'rhoa': ss.rhoa,
             'alpha': ss.alpha,
-            'T': 1000,      #1000
-            'noise': ss.var_eps_z,
+            'T': 1000,      
+            'noise': ss.dev_eps_z,
             'version': version},
 )
 
@@ -210,15 +210,37 @@ for iter in tqdm(range(EPOCHS)):
                     
 
                     #distance from FOC
-                    if t>0:
-                        k1 = last_sim[t]['st'][1]
-                        z0 = last_sim[t-1]['st'][0]
-                        E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-                        c0 = last_sim[t-1]['c']
-                        c1 = last_sim[t]['c']
-                        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) )
-                        c_ratio = c1/c0
-                        euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+                    if version == 'deterministic': 
+                        if t>0:
+                            k1 = last_sim[t]['st'][1]
+                            z0 = last_sim[t-1]['st'][0]
+                            #E_z1 = (1-ss.rhoa) + ss.rhoa * z0
+                            c0 = last_sim[t-1]['c']
+                            c1 = last_sim[t]['c']
+                            c_ratio_star = ss.beta*((1 - ss.delta) + ss.alpha * ((k1)**(ss.alpha-1)) )
+                            c_ratio = c1/c0
+                            #euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+                            euler_gap += (c_ratio - c_ratio_star)**2
+                        else:
+                            break
+                    else: 
+                        k1 = last_sim[t]['st1'][1]
+                        z0 = last_sim[t]['st'][0]
+                        c0 = last_sim[t]['c']
+                        mu0 = 1/c0
+                        mu1 = np.zeros(ss.nbz)
+                        Z, Pi = ss.tauchenhussey_local(ss.nbz, z0)
+                        for i in range(ss.nbz): 
+                            with torch.no_grad():
+                                st_tensor_foc = torch.from_numpy(np.array([Z[i], k1])).float().to(device)
+                                action_tensor_foc, _ = agent.get_action(st_tensor_foc, test=True)
+                                a = action_tensor_foc.squeeze().numpy()
+                                _, _, done, _, rec_foc = test_sim.step(a)
+                                c1 = rec_foc['c']
+                                mu1[i] = 1/c1
+                        r1 = (1-ss.delta) + Z * ss.alpha * (k1**(ss.alpha-1))
+                        EPS = np.sum(Pi * (mu1*r1))
+                        euler_gap += (mu0 - ss.beta * EPS)**2 
                     
                     #final distance from ss
                     if t==T_test-1:
@@ -237,7 +259,7 @@ for iter in tqdm(range(EPOCHS)):
         last_cons /= n_eval 
         random_util /= n_eval
 
-        writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
+        writer.add_scalar("squared distance from opt consumption ratio (euler)", euler_gap, iter) 
         writer.add_scalar("pct welfare gain of steady state to current policy (test)", ((vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", ((total_utility-random_util)/random_util)*100 , iter) 
         writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)

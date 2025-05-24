@@ -8,10 +8,10 @@ class steady:
         self.delta =  0.01 #0.03 #0.01 #depreciation rate
         self.states = 2    #4
 
-        self.gamma = 1 #consumption pref
-        self.rhoa = 0.9 #AR coff 
-        self.alpha = 0.35 #prduction function
-        self.var_eps_z = 0.001 #variance of TFP shock 
+        self.gamma = 1        #consumption pref
+        self.rhoa = 0.9       #AR coff 
+        self.alpha = 0.35     #prduction function
+        self.dev_eps_z = 0.01 #std dev of TFP shock 
         self.actions = 1
         self.nbz = 11 #dimension of the quadrature
     
@@ -67,12 +67,39 @@ class steady:
         for i in range(N):
             for j in range(N):
                 Pi[i, j] = ((1/np.sqrt(np.pi)) * w0[j] * np.exp(x0[j]**2 - (x0[j] - self.rhoa * x0[i])**2 ))/tau[i]
+
+        for i in range(10):
+            Pi = Pi / Pi.sum(axis=1, keepdims=True)
         
         Z = np.zeros(N) #grid
         for i in range(N): 
-            Z[i] = self.var_eps_z * np.sqrt(2) * x0[i] + 1 #mean = 1, std = var_eps_z
+            Z[i] = self.dev_eps_z * np.sqrt(2) * x0[i] + 1 #mean = 1, std = dev_eps_z
 
-        return Z, Pi 
+        return Z, Pi
+    
+    def tauchenhussey_local(self, N, z):
+        x0, w0 = self.gausshermite(N)
+        #tau = np.zeros(N)
+        x =  ((z - 1) / (self.dev_eps_z * np.sqrt(2)))
+        
+        tau_i = 0
+        for j in range(N):
+            tau_i += w0[j] * np.exp(x0[j]**2 - (x0[j] - self.rhoa * x)**2 ) 
+        tau = (1/np.sqrt(np.pi)) * tau_i 
+        
+        Pi = np.zeros(N) #transition matrix
+        
+        for j in range(N):
+            Pi[j] = ((1/np.sqrt(np.pi)) * w0[j] * np.exp(x0[j]**2 - (x0[j] - self.rhoa * x)**2 ))/tau
+
+        for i in range(10):
+            Pi = Pi / Pi.sum(axis=0, keepdims=True)
+        
+        Z = np.zeros(N) #grid
+        for i in range(N): 
+            Z[i] = self.dev_eps_z * np.sqrt(2) * x0[i] + 1 #mean = 1, std = dev_eps_z
+
+        return Z, Pi
     
     def gausshermite(self, n):
         x0, w0 = np.polynomial.hermite.hermgauss(n)

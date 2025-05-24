@@ -28,7 +28,7 @@ class Model(gym.Env):
         self.c0 = c_ss
         self.y0 = y_ss
         self.var_k = var_k
-        self.noise = noise
+        self.noise = noise #st dev 
         self.version = version
 
     def reset(self, seed=None, options=None):
