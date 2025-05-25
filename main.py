@@ -17,13 +17,13 @@ from gymnasium.vector import SyncVectorEnv
 '''CONTROLS'''
 comment = 'SGM_'
 #working version
-version = "stochastic" # deterministic ; stochastic  
+version = "deterministic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
-frq_test = 5 
+frq_test = 50
 EPOCHS = 45000
 
 plot_histogram = 0 #1 plots the action dist conitional on steady state 
@@ -221,8 +221,6 @@ for iter in tqdm(range(EPOCHS)):
                             c_ratio = c1/c0
                             #euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
                             euler_gap += (c_ratio - c_ratio_star)**2
-                        else:
-                            break
                     else: 
                         k1 = last_sim[t]['st1'][1]
                         z0 = last_sim[t]['st'][0]
