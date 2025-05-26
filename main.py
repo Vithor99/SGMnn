@@ -17,7 +17,7 @@ from gymnasium.vector import SyncVectorEnv
 '''CONTROLS'''
 comment = 'SGM_'
 #working version
-version = "deterministic" # deterministic ; stochastic  
+version = "stochastic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
@@ -26,7 +26,7 @@ T_train = 550
 frq_test = 50
 EPOCHS = 45000
 
-plot_histogram = 0 #1 plots the action dist conitional on steady state 
+plot_histogram = 0 #1 plots the action dist conditional on steady state 
 
 
 '''SETTING PARAMETERS''' 
@@ -176,6 +176,8 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap = 0
         last_state = 0
         last_cons = 0 
+        avg_cons = 0
+        avg_state = 0
         random_util = 0
 
         for _ in range(n_eval):
@@ -240,10 +242,12 @@ for iter in tqdm(range(EPOCHS)):
                         EPS = np.sum(Pi * (mu1*r1))
                         euler_gap += (mu0 - ss.beta * EPS)**2 
                     
-                    #final distance from ss
+                    #average distance from ss
                     if t==T_test-1:
                         last_state += st1[1]
                         last_cons += last_sim[t]['c']
+                        avg_cons += np.mean([last_sim[i]['c'] for i in sorted(last_sim)])
+                        avg_state += np.mean([last_sim[i]['st'][1] for i in sorted(last_sim)])
                         
                     st = st1
 
@@ -255,13 +259,15 @@ for iter in tqdm(range(EPOCHS)):
         euler_gap /= n_eval*T_test
         last_state /= n_eval
         last_cons /= n_eval 
+        avg_cons /= n_eval
+        avg_state /= n_eval
         random_util /= n_eval
 
         writer.add_scalar("squared distance from opt consumption ratio (euler)", euler_gap, iter) 
         writer.add_scalar("pct welfare gain of steady state to current policy (test)", ((vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", ((total_utility-random_util)/random_util)*100 , iter) 
-        writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
-        writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
+        writer.add_scalar("pct distance of k to k_ss", (np.abs(avg_state - k_ss)/k_ss)*100, iter)
+        writer.add_scalar("pct distance of c to c_ss", (np.abs(avg_cons - c_ss)/c_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         
   
