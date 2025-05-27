@@ -40,10 +40,9 @@ parser.add_argument('--n_neurons', default=128, type=int)
 parser.add_argument('--policy_var', default=-3.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
-parser.add_argument('--lr', default=1e-3, type=float)
-parser.add_argument('--batch_size', default=2048, type=int)
-parser.add_argument('--learn_std', default=0, type=int)
-
+parser.add_argument('--lr', default=1e-3, type=float)          #here we might want to try 1e-4
+parser.add_argument('--batch_size', default=2048, type=int)    #try 1024
+parser.add_argument('--learn_std', default=0, type=int)        #try 1
 ''' SIMULATOR '''
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()

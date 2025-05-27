@@ -54,7 +54,7 @@ class StochasticPolicyNetwork(nn.Module):
                 nn.Linear(architecture_params['n_neurons'], action_dim),
             )
         else:
-            self.log_std = nn.Parameter(torch.ones((1, action_dim)) * self.var_scale)  #not super clear what nn.Parameter does 
+            self.log_std = nn.Parameter(torch.ones((1, action_dim)) * self.var_scale) 
         self.sigmoid = nn.Sigmoid()
 
 
