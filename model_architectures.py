@@ -6,7 +6,7 @@ from torch.distributions import Normal
 import torch.distributions as D
 import torch.distributions.transforms as T
 from utils import state_preprocessor
-
+from steady import steady
 
 class ValueNetwork(nn.Module):
     def __init__(self, input_dim, architecture_params, output_dim):
@@ -19,8 +19,11 @@ class ValueNetwork(nn.Module):
         layers += [nn.Linear(architecture_params['n_neurons'], output_dim)]
         self.network = nn.Sequential(*layers)
 
+        self.ss = steady()
+        self.c_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
+
     def forward(self, x, a=None):
-        x = state_preprocessor(x)
+        x = state_preprocessor(x, self.k_ss)
         x = x if a is None else torch.cat([x, a], -1)
         return self.network(x)
 
@@ -57,10 +60,13 @@ class StochasticPolicyNetwork(nn.Module):
             self.log_std = nn.Parameter(torch.ones((1, action_dim)) * self.var_scale) 
         self.sigmoid = nn.Sigmoid()
 
+        self.ss = steady()
+        self.c_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
+
 
     def forward(self, state):
 
-        state = state_preprocessor(state)
+        state = state_preprocessor(state, self.k_ss)
         x = self.base(state)
         mean = self.mean_head(x)
 
@@ -76,7 +82,7 @@ class StochasticPolicyNetwork(nn.Module):
         state = state.view(1, -1) if state.dim() == 1 else state
         mean, std = self.forward(state)
 
-        lower_bound = torch.zeros_like(mean[:,0])
+        lower_bound = torch.zeros_like(mean[:, 0])
         upper_bound = torch.ones_like(mean[:, 0]) * 1.0 
         base_dist = D.Normal(mean[:, 0], std[:, 0])
         sigmoid_transform = T.SigmoidTransform()

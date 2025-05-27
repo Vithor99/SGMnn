@@ -6,10 +6,17 @@ import torch.optim as optim
 from torch.distributions import Normal
 import random
 from collections import deque
+from steady import steady
 
 
-def state_preprocessor(s):
-    return s/10           #changed from 100
+def state_preprocessor(s, k_ss):
+    if s.ndim == 1:
+        return torch.tensor([s[0], s[1] / k_ss])
+    else:
+        s1 = s[:, 0].unsqueeze(1)
+        s2 = (s[:, 1] / k_ss).unsqueeze(1) 
+        return torch.cat([s1, s2], dim=1)
+    
 
 
 def soft_update(nets, nets_target, tau=0.005):

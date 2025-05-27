@@ -158,7 +158,8 @@ if run_simulation == "yes":
         #c_grid = float(optimal_c(k_grid))
         c_grid = float(optimal_c(state_grid))
         u_grid = ss.gamma*np.log(c_grid) #+ ss.psi*np.log(1-a[1])
-        k1_grid = float(optimal_k1(state_grid))
+        #k1_grid = float(optimal_k1(state_grid))
+        k1_grid = (1 - ss.delta)*k_grid + y_grid - c_grid
         grid_v += ss.beta**t * u_grid
         grid_sim[t] = {'k': k_grid,
                     'z': z,
