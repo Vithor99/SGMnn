@@ -18,8 +18,8 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_LowB_steady_deterministic.pt' 
-grid_model = 'Grid_SGM_LowB_deterministic.pkl'
+rl_model = 'SGM_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_stochastic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
@@ -37,7 +37,7 @@ if run_policy == "yes":
     dev = 5
     N = 500
 
-run_irfs = "no"
+run_irfs = "yes"
 if run_irfs == "yes": 
     dev = 5 
     N = 500
@@ -142,8 +142,6 @@ if run_simulation == "yes":
         c_rl = y_rl * (1-sratio_rl)
         u_rl = ss.gamma*np.log(c_rl)
         k1_rl = (1 - ss.delta)*k_rl + y_rl - c_rl
-        #st1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
-        #u_rl = ss.gamma*np.log(action_rl[0]) + ss.psi*np.log(1-action_rl[1])
         rl_v += ss.beta**t * u_rl
         rl_sim[t] = {'k': k_rl,
                     'z': z,
@@ -154,7 +152,6 @@ if run_simulation == "yes":
 
         #Grid 
         # Find the position of the value 1 in zgrid
-        #a = np.array([ss.get_consumption(k[1], 1, float(optimal_n(k[1])[z_psx])), float(optimal_n(k[1])[z_psx])])
         k_grid = st[1]
         y_grid = z * (k_grid**ss.alpha)
         state_grid = np.array([z, float(k_grid)])
@@ -250,90 +247,6 @@ if run_simulation == "yes":
     plot_path = folder + rl_model.replace('.pt', '_consumption.png')
     fig.savefig(plot_path)
 
-    """ #labour
-    n_grid = [entry['a'][1] for entry in grid_sim.values()]
-    n_rl = [entry['a'][1] for entry in rl_sim.values()]
-
-    #distance from steady state
-    rl_ss = np.mean(n_rl[-n:])
-    grid_ss = np.mean(n_grid[-n:])
-    ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
-    print(f"Labour distance from steady state: {ss_dev*100:.2f}%")
-
-    fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(n_grid, color='blue', linewidth=1.5, label='Grid')
-    ax.plot(n_rl, color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(n_ss, color="black", linewidth=1.2, linestyle = '--', label='Steady State')
-    ax.set_title("Labour", fontsize=16)
-    ax.set_xlabel("Periods", fontstyle='italic')         
-    ax.set_ylabel(r'$n_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(n_ss*(1-(zoom_factor/100)), n_ss*(1+(zoom_factor/100)))
-    ax.legend()          
-    ax.grid(axis='both', alpha=0.5)                         
-    ax.tick_params(axis='x', direction='in')
-    ax.tick_params(axis='y', direction='in')
-
-    fig.autofmt_xdate() 
-    plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_labour.png')
-    fig.savefig(plot_path) """
-
-    """ if run_foc == "yes":
-        #labour supply foc
-        fig, ax = plt.subplots(figsize=(5, 6))  
-        ax.plot(labour_gap[:, 0], color='#F08080', linewidth=1.0, alpha = 0.35,  label='RL')
-        ax.plot(labour_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
-
-        # Smooth labour_gap[:, 0] with exponential smoothing
-        alpha = 0.2  # Smoothing parameter
-        smoothed_labour_gap = np.zeros_like(labour_gap[:, 0])
-        smoothed_labour_gap[0] = labour_gap[0, 0]
-        for i in range(1, len(labour_gap[:, 0])):
-            smoothed_labour_gap[i] = alpha * labour_gap[i, 0] + (1 - alpha) * smoothed_labour_gap[i - 1]
-        
-        ax.plot(smoothed_labour_gap, color='crimson', linewidth=1.5, label='Smoothed RL')
-
-        ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
-        ax.set_title("Distance from Labour Supply", fontsize=16)
-        ax.set_xlabel("Periods", fontstyle='italic')         
-        ax.set_ylabel(r'$\% \Delta \ \ c_t$', fontstyle='italic')
-        ax.legend()          
-        ax.grid(axis='both', alpha=0.5)                         
-        ax.tick_params(axis='x', direction='in')
-        ax.tick_params(axis='y', direction='in')
-
-        fig.autofmt_xdate() 
-        plt.tight_layout()
-        plot_path = 'plots/' + rl_model.replace('.pt', '_lab_supply_foc.png')
-        fig.savefig(plot_path)
-
-        #euler foc
-        fig, ax = plt.subplots(figsize=(5, 6))  
-        ax.plot(euler_gap[:, 0], color='#F08080', linewidth=1.0, alpha = 0.35,  label='RL')
-        ax.plot(euler_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
-
-        alpha = 0.1  # Smoothing parameter
-        smoothed_euler_gap = np.zeros_like(euler_gap[:, 0])
-        smoothed_euler_gap[0] = euler_gap[0, 0]
-        for i in range(1, len(euler_gap[:, 0])):
-            smoothed_euler_gap[i] = alpha * euler_gap[i, 0] + (1 - alpha) * smoothed_euler_gap[i - 1]
-        
-        ax.plot(smoothed_euler_gap, color='crimson', linewidth=1.5, label='Smoothed RL')
-
-        ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
-        ax.set_title("Distance from Euler", fontsize=16)
-        ax.set_xlabel("Periods", fontstyle='italic')         
-        ax.set_ylabel(r'$\% \Delta \ \ \frac{c_{t+1}}{c_t}$', fontstyle='italic')
-        ax.legend()          
-        ax.grid(axis='both', alpha=0.5)                         
-        ax.tick_params(axis='x', direction='in')
-        ax.tick_params(axis='y', direction='in')
-
-        fig.autofmt_xdate() 
-        plt.tight_layout()
-        plot_path = folder + rl_model.replace('.pt', '_euler_foc.png')
-        fig.savefig(plot_path) """
 
     #vss = ss.ss_value(T)
     print(f"Steady state value = {v_ss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
@@ -369,10 +282,6 @@ if run_policy == "yes":
             c_rl = (1 - action_rl) * y_rl
             k1_rl = (1 - ss.delta)*k_values[i] + action_rl * y_rl
             v_rl = float(value_rl)
-            #c_rl = action_rl[0]
-            #n_rl = action_rl[1]
-            #k1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
-            #v_rl = float(value_rl)
 
             #Grid 
             c_grid = optimal_c(st)
@@ -386,17 +295,15 @@ if run_policy == "yes":
             k1_values_rl[i,j] = k1_rl 
             v_values_grid[i,j] = v_grid
             v_values_rl[i,j] = v_rl
-            #c_values[i] = [c_rl, c_grid]
-            #n_values[i] = [n_rl, n_grid]
-            #k1_values[i] = [k1_rl, k1_grid]
-            #v_values[i] = [v_rl, v_grid]
+
 
         # How much the RL policy deviates from Grid for a 5% deviation from steady state
         p = len(k_values)-1
+        z_diff = (zgrid[j] - 1)
         k_diff = (k_values[p] - k_ss) / np.abs(k_ss)
-        c_diff = (c_values_rl[p] - c_values_grid[p]) / np.abs(c_values_grid[p])
+        c_diff = (c_values_rl[p, j] - c_values_grid[p, j]) / np.abs(c_values_grid[p, j])
         #n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
-        print(f"Consumption deviation from grid policy for a {k_diff *100}% k deviation: {c_diff*100:.2f}%")
+        print(f"Consumption deviation from grid policy for a {k_diff *100}% k deviation and a {z_diff *100}% z deviation: {c_diff*100:.2f}%")
         #print(f"Labour deviation from grid policy for a {k_diff *100}% k deviation: {n_diff*100:.2f}%")
 
 
@@ -422,71 +329,11 @@ if run_policy == "yes":
     plot_path = folder + rl_model.replace('.pt', '_cons_rule.png')
     fig.savefig(plot_path)
 
-    """ #labour
-    fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, n_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, n_values[:, 1], color='blue', linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, n_ss, color='black', label='Steady State', s=20, zorder=5)
-    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
-    ax.axhline(n_ss, color='black', linestyle=':', linewidth=1)
-    ax.set_title("Labour Rule", fontsize=16)
-    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-    ax.set_ylabel(r'$n_t$', fontstyle='italic')
-    ax.legend()          
-    ax.grid(axis='both', alpha=0.5)                          
-    ax.tick_params(axis='x', direction='in')
-    ax.tick_params(axis='y', direction='in')
-
-    fig.autofmt_xdate() 
-    plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_lab_rule.png')
-    fig.savefig(plot_path) """
-
-    """ #capital
-    fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, k1_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, k1_values[:, 1], color='blue', linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, k_ss, color='black', label='Steady State', s=20, zorder=5)
-    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
-    ax.axhline(k_ss, color='black', linestyle=':', linewidth=1)
-    ax.set_title("Saving Rule", fontsize=16)
-    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-    ax.set_ylabel(r'$k_{t+1}$', fontstyle='italic')
-    ax.legend()          
-    ax.grid(axis='both', alpha=0.5)                          
-    ax.tick_params(axis='x', direction='in')
-    ax.tick_params(axis='y', direction='in')
-
-    fig.autofmt_xdate() 
-    plt.tight_layout()
-    plot_path = folder + rl_model.replace('.pt', '_saving_rule.png')
-    fig.savefig(plot_path)
-
-    #value function
-    fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, v_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, v_values[:, 1], color='blue', linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, v_ss, color='black', label='Steady State', s=20, zorder=5)
-    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
-    ax.axhline(v_ss, color='black', linestyle=':', linewidth=1)
-    ax.set_title("Value Function", fontsize=16)
-    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-    ax.set_ylabel(r'$V(k_t)$', fontstyle='italic')
-    ax.legend()          
-    ax.grid(axis='both', alpha=0.5)                          
-    ax.tick_params(axis='x', direction='in')
-    ax.tick_params(axis='y', direction='in')
-
-    fig.autofmt_xdate() 
-    plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_value_function.png')
-    fig.savefig(plot_path) """
-
 
 ''' IRFs '''
 # IRFs for consumption, capital, and value function
 if run_irfs == 'yes':
-    irf_length = 20
+    irf_length = 100
     irf_c = np.zeros((irf_length, 2))
     irf_y = np.zeros((irf_length, 2))
     irf_k = np.zeros((irf_length, 2))
