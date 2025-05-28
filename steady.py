@@ -14,6 +14,10 @@ class steady:
         self.dev_eps_z = 0.007 #std dev of TFP shock 
         self.actions = 1
         self.nbz = 11 #dimension of the quadrature
+        self.nbr = 2           # number of regimes 
+        self.tau = 0.05        # tax
+        self.pi_tau = 0.01     # probability that tax s introduced
+
     
     def equations(self, vars):
         c, k = vars
@@ -104,6 +108,35 @@ class steady:
     def gausshermite(self, n):
         x0, w0 = np.polynomial.hermite.hermgauss(n)
         return x0, w0
+    
+    def equations_regime(self, vars):
+        c, k = vars
+        ee = 1 - self.beta*((1-self.delta) + (1 - self.tau) * self.alpha*k**(self.alpha-1))  
+        kt = self.delta*k - (1 - self.tau) * k**self.alpha + c 
+        return [ee, kt]
+    
+    def ss_regime(self):
+        initial_guess = [0.5, 0.5]
+        solution = fsolve(self.equations_regime, initial_guess)
+        c_ss, k_ss = solution
+        y_ss = (k_ss)**self.alpha
+        u_ss = self.gamma*np.log(c_ss)
+        v_ss = (1/(1-self.beta))*u_ss
+        tau_ss = self.tau * y_ss
+        return c_ss, k_ss, y_ss, u_ss, v_ss 
+    
+    def regimes(self):
+        Z = np.array([0, self.tau])
+        Pi = np.array([[1-self.pi_tau, self.pi_tau], [0, 1]])
+        return Z, Pi
+    
+    def next_regime(self, r):
+        Z, Pi = self.regimes()
+        if r == 0:
+            r1 = np.random.choice([Z[0], Z[1]], p=[Pi[0, 0], Pi[0, 1]])
+        else:
+            r1 = Z[1]  # since Pi[1, 1] = 1, always stays in regime 1
+        return r1
     
 
     

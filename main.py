@@ -17,7 +17,7 @@ from gymnasium.vector import SyncVectorEnv
 '''CONTROLS'''
 comment = 'SGM_'
 #working version
-version = "stochastic" # deterministic ; stochastic  
+version = "regime" 
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
@@ -76,11 +76,14 @@ name_exp += str(sim_length)
 writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
-c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
+c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_regime()
 s_ratio_ss = 1 - (c_ss/y_ss)
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
+
+tau = (1 - ss.tau)
+pi_tau = ss.pi_tau
 
 ''' Define Model'''
 architecture_params = {'n_layers': args.n_layers,
@@ -105,6 +108,8 @@ register(
     kwargs={'k_ss': k_ss,
             'c_ss': c_ss,
             'y_ss': y_ss,
+            'tau' : tau,
+            'pi_tau': pi_tau,
             'n_states': state_dim,
             'var_k': var_k0/100,
             'gamma': ss.gamma,
