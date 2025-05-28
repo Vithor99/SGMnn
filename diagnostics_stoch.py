@@ -18,21 +18,23 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_steady_stochastic.pt' 
+rl_model = 'SGM_newPrepoc_steady_stochastic.pt' 
 grid_model = 'Grid_SGM_stochastic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
-run_simulation = "yes" #if yes it runs the simulation
+zoom = "in" #this needs to be adjusted
+
+run_simulation = "no" #if yes it runs the simulation
 if run_simulation == "yes":
     T = 500
-    dev = 5 #Pct initial deviation from steady state
+    dev = 0 #Pct initial deviation from steady state
     zoom = "in" # in or out: if out zoom factor is activated 
     zoom_factor = 10 # if zoom == "out": pct band around ss that we want to visualize
     run_foc = "yes" # if yes it runs the focs of the model
     n = 200 # number of periods to compute the steady state of the simulation
 
-run_policy = "yes" # if yes it runs the policy evaluation
+run_policy = "no" # if yes it runs the policy evaluation
 if run_policy == "yes":
     dev = 5
     N = 500
@@ -92,6 +94,21 @@ rl_model_path = 'saved_models/' + rl_model
 agent.load_state_dict(torch.load(rl_model_path, map_location=device))
 agent.eval()
 
+''' COMPUTING THE STEADY STATE OF RL'''
+k_rl = k_ss
+K = np.zeros(1000)
+for t in range(1000):
+    #RL 
+    state_rl = torch.from_numpy(np.array([1, k_rl])).float().to(device)
+    with torch.no_grad():
+        action_tensor, _ = agent.get_action(state_rl, test=True)
+        sratio_rl = action_tensor.squeeze().numpy()
+    k1_rl = (1 - ss.delta)*k_rl + (k_rl**ss.alpha) * sratio_rl
+    K[t] = k1_rl
+    k_rl = k1_rl
+k_ss_rl = np.mean(K[-100:])
+
+        
 
 ''' LOADING GRID MODEL'''
 #need to update for stochastic version 
@@ -120,7 +137,9 @@ optimal_c = interp2d((zgrid, k), c_star.T)
 
 ''' SIMULATION '''
 if run_simulation == "yes":
-    st = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    # RL, Grid
+    #st = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    st = np.array([k_ss_rl*(1+(dev/100)), k_ss*(1+(dev/100))])
     z = 1 #we want the same series for productivity in the two economies
     #z_psx = int(np.where(zgrid == 1)[0])
     grid_sim={}
@@ -334,29 +353,29 @@ if run_policy == "yes":
 ''' IRFs '''
 # IRFs for consumption, capital, and value function
 if run_irfs == 'yes':
-    irf_length = 100
+    irf_length = 500
     irf_c = np.zeros((irf_length, 2))
     irf_y = np.zeros((irf_length, 2))
     irf_k = np.zeros((irf_length, 2))
     irf_v = np.zeros((irf_length, 2))
 
     # z dev 
-    z_dev = 0.01  # 1% deviation from steady state
+    z_dev = 0.03  # 1% deviation from steady state
     z0 = 1 + z_dev  # Initial z value
     k0_grid = k_ss
-    k0_rl = k_ss
+    k0_rl = k_ss_rl
     for t in range(irf_length):
 
         st_rl = np.array([z0, k0_rl])
-        state = torch.from_numpy(st).float().to(device)
+        state = torch.from_numpy(st_rl).float().to(device)
         with torch.no_grad():
             action_tensor, _ = agent.get_action(state, test=True)
             action_rl = action_tensor.squeeze().numpy()
             value_tensor = agent.get_value(state)
             value_rl = value_tensor.numpy()
-        y_rl = (k_ss**ss.alpha)
+        y_rl = (k0_rl**ss.alpha)
         c_rl = (1 - action_rl) * y_rl
-        k1_rl = (1 - ss.delta)*k_ss + action_rl * y_rl
+        k1_rl = (1 - ss.delta)*k0_rl + action_rl * y_rl
         v_rl = float(value_rl)
 
         st_grid = np.array([z0, k0_grid])
@@ -384,7 +403,7 @@ if run_irfs == 'yes':
     ax.plot(irf_c[:,1], color='blue', linewidth=1.5, label='Grid')
     ax.plot(irf_c[:,0], color='crimson', linewidth=1.5, label='RL')
     ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.set_title("Consumption", fontsize=16)
+    ax.set_title("Consumption to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     if zoom == "out":
@@ -396,7 +415,111 @@ if run_irfs == 'yes':
 
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = folder + rl_model.replace('.pt', '_IRF_consumption.png')
+    plot_path = folder + rl_model.replace('.pt', '_IRF_consumption_z.png')
+    fig.savefig(plot_path)
+
+    # Plotting IRFs
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(irf_k[:,1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(irf_k[:,0], color='crimson', linewidth=1.5, label='RL')
+    ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.set_title("Capital to z shock", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$k_t$', fontstyle='italic')
+    if zoom == "out":
+        ax.set_ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_IRF_capital_z.png')
+    fig.savefig(plot_path)
+
+    # IRF for Capital deviation
+    irf_c = np.zeros((irf_length, 2))
+    irf_y = np.zeros((irf_length, 2))
+    irf_k = np.zeros((irf_length, 2))
+    irf_v = np.zeros((irf_length, 2))
+
+     
+    #z_dev = 0.03  # 1% deviation from steady state
+    z0 = 1 #+ z_dev  # Initial z value
+    k0_grid = k_ss * (1 + 0.05)
+    k0_rl = k_ss_rl * (1 + 0.05)
+    for t in range(irf_length):
+
+        st_rl = np.array([z0, k0_rl])
+        state = torch.from_numpy(st_rl).float().to(device)
+        with torch.no_grad():
+            action_tensor, _ = agent.get_action(state, test=True)
+            action_rl = action_tensor.squeeze().numpy()
+            value_tensor = agent.get_value(state)
+            value_rl = value_tensor.numpy()
+        y_rl = (k0_rl**ss.alpha)
+        c_rl = (1 - action_rl) * y_rl
+        k1_rl = (1 - ss.delta)*k0_rl + action_rl * y_rl
+        v_rl = float(value_rl)
+
+        st_grid = np.array([z0, k0_grid])
+        c_grid = float(optimal_c(st_grid))
+        v_grid = float(optimal_v(st_grid))
+        k1_grid = float(optimal_k1(st_grid))
+        y_grid = z0*k0_grid**ss.alpha
+
+
+        # Store IRFs
+        irf_c[t] = [c_rl, c_grid]
+        irf_k[t] = [k1_rl, k1_grid]
+        irf_v[t] = [v_rl, v_grid]
+        irf_y[t] = [y_rl, y_grid]
+
+        # Update z for next period
+        z1 = (1 - ss.rhoa) + ss.rhoa * z0 
+        z0 = z1
+        k0_grid = k1_grid
+        k0_rl = k1_rl
+
+    # Plotting IRFs
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(irf_c[:,1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(irf_c[:,0], color='crimson', linewidth=1.5, label='RL')
+    ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.set_title("Consumption to k shock", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$c_t$', fontstyle='italic')
+    if zoom == "out":
+        ax.set_ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_IRF_consumption_k.png')
+    fig.savefig(plot_path)
+
+    # Plotting IRFs
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(irf_k[:,1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(irf_k[:,0], color='crimson', linewidth=1.5, label='RL')
+    ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.set_title("Capital to k shock", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$k_t$', fontstyle='italic')
+    if zoom == "out":
+        ax.set_ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
+    ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_IRF_capital_k.png')
     fig.savefig(plot_path)
 
     
