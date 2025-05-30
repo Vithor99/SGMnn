@@ -17,8 +17,8 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_LowB_steady_deterministic.pt' 
-grid_model = 'Grid_SGM_LowB_deterministic.pkl'
+rl_model = 'SGM_steady_deterministic.pt' 
+grid_model = 'Grid_SGM_deterministic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
@@ -113,16 +113,6 @@ optimal_v = interp(k, value_star)
 def optimal_c(k): 
     return float((1 - optimal_a(k)) * (k**ss.alpha)) 
 
-''' Old grid solution 
-kgrid = loaded_data['kgrid']
-kp_star = loaded_data['kp_star']
-control_star = loaded_data['control_star']
-v_star = loaded_data['value_star']
-optimal_kp = interp1d(kgrid, kp_star, kind="slinear", bounds_error=False, fill_value=0)
-#optimal_c  = interp1d(kgrid, control_star[:, 0], kind="slinear", bounds_error=False, fill_value=0)
-optimal_n  = interp1d(kgrid, control_star, kind="slinear", bounds_error=False, fill_value=0)
-optimal_v = interp1d(kgrid, v_star, kind="slinear", bounds_error=False, fill_value=0)
-'''
 
 ''' SIMULATION '''
 if run_simulation == "yes":
