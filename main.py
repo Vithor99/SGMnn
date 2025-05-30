@@ -25,7 +25,7 @@ run_EulerResid = "no"
 
 T_test = 550
 T_train = 550
-frq_test = 50
+frq_test = 10
 EPOCHS = 45000
 
 plot_histogram = 0 #1 plots the action dist conditional on steady state 
@@ -76,13 +76,13 @@ name_exp += str(sim_length)
 writer = SummaryWriter("logs/"+ name_exp)
 
 ''' Define Simulator'''
-c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss_regime()
+c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 s_ratio_ss = 1 - (c_ss/y_ss)
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
 
-tau = (1 - ss.tau)
+tau = ss.tau
 pi_tau = ss.pi_tau
 
 ''' Define Model'''
@@ -272,8 +272,8 @@ for iter in tqdm(range(EPOCHS)):
         writer.add_scalar("squared distance from opt consumption ratio (euler)", euler_gap, iter) 
         writer.add_scalar("pct welfare gain of steady state to current policy (test)", ((vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", ((total_utility-random_util)/random_util)*100 , iter) 
-        writer.add_scalar("pct distance of k to k_ss", (np.abs(avg_state - k_ss)/k_ss)*100, iter)
-        writer.add_scalar("pct distance of c to c_ss", (np.abs(avg_cons - c_ss)/c_ss)*100, iter)
+        writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
+        writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         
   

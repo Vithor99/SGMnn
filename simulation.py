@@ -27,10 +27,10 @@ class Model(gym.Env):
         self.k0 = k_ss
         self.c0 = c_ss
         self.y0 = y_ss
-        self.tau = tau       #0.95
+        self.tau = tau       #0.95   s: 0 0 0 0 0 0.95 0.95 0.95 ...
         self.pi_tau = pi_tau #0.01
         self.var_k = var_k
-        self.noise = noise #st dev 
+        self.noise = noise   #st dev 
         self.version = version
 
     def reset(self, seed=None, options=None):
@@ -38,7 +38,7 @@ class Model(gym.Env):
         self.state[0] = 1
 
         if options=="steady":
-            self.state[1] = 27.39654 #self.k0 #change
+            self.state[1] = 27.2628 #self.k0 #change
         else:
             self.state[1] = np.random.uniform(low=self.k0*(1-self.var_k), high=self.k0*(1+self.var_k)) 
         
