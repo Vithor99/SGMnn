@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_newPrepoc_steady_stochastic.pt' 
+rl_model = 'SGM_oldPrepoc_steady_stochastic.pt' 
 grid_model = 'Grid_SGM_stochastic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
@@ -298,7 +298,7 @@ if run_policy == "yes":
                 action_rl = action_tensor.squeeze().numpy()
                 value_tensor = agent.get_value(state)
                 value_rl = value_tensor.numpy()
-            y_rl = (k_values[i]**ss.alpha)
+            y_rl = zgrid[j] * (k_values[i]**ss.alpha)
             c_rl = (1 - action_rl) * y_rl
             k1_rl = (1 - ss.delta)*k_values[i] + action_rl * y_rl
             v_rl = float(value_rl)
@@ -373,7 +373,7 @@ if run_irfs == 'yes':
             action_rl = action_tensor.squeeze().numpy()
             value_tensor = agent.get_value(state)
             value_rl = value_tensor.numpy()
-        y_rl = (k0_rl**ss.alpha)
+        y_rl = z0 * (k0_rl**ss.alpha)
         c_rl = (1 - action_rl) * y_rl
         k1_rl = (1 - ss.delta)*k0_rl + action_rl * y_rl
         v_rl = float(value_rl)
@@ -458,7 +458,7 @@ if run_irfs == 'yes':
             action_rl = action_tensor.squeeze().numpy()
             value_tensor = agent.get_value(state)
             value_rl = value_tensor.numpy()
-        y_rl = (k0_rl**ss.alpha)
+        y_rl = z0*(k0_rl**ss.alpha)
         c_rl = (1 - action_rl) * y_rl
         k1_rl = (1 - ss.delta)*k0_rl + action_rl * y_rl
         v_rl = float(value_rl)
