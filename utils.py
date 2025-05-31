@@ -17,7 +17,8 @@ def state_preprocessor(s, k_ss):
         s2 = (s[:, 1] / k_ss).unsqueeze(1) 
         return torch.cat([s1, s2], dim=1)
     
-
+def state_preprocessor_simple(s):
+    return s/10 
 
 def soft_update(nets, nets_target, tau=0.005):
     for param, target_param in zip(nets.parameters(), nets_target.parameters()):

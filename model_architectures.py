@@ -6,6 +6,7 @@ from torch.distributions import Normal
 import torch.distributions as D
 import torch.distributions.transforms as T
 from utils import state_preprocessor
+from utils import state_preprocessor_simple
 from steady import steady
 
 class ValueNetwork(nn.Module):
@@ -23,7 +24,8 @@ class ValueNetwork(nn.Module):
         self.c_ss, self.k_ss, self.y_ss, self.u_ss, self.v_ss = self.ss.ss()
 
     def forward(self, x, a=None):
-        x = state_preprocessor(x, self.k_ss)
+        #x = state_preprocessor(x, self.k_ss)
+        x = state_preprocessor_simple(x)
         x = x if a is None else torch.cat([x, a], -1)
         return self.network(x)
 
@@ -66,7 +68,8 @@ class StochasticPolicyNetwork(nn.Module):
 
     def forward(self, state):
 
-        state = state_preprocessor(state, self.k_ss)
+        #state = state_preprocessor(state, self.k_ss)
+        state = state_preprocessor_simple(state)
         x = self.base(state)
         mean = self.mean_head(x)
 

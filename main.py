@@ -15,9 +15,9 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 # baseline version is now: 2 states, beta = 0.97 and delta = 0.01
 '''CONTROLS'''
-comment = 'SGM_'
+comment = 'SGM_oldPrepoc_'
 #working version
-version = "stochastic" # deterministic ; stochastic  
+version = "deterministic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
@@ -39,7 +39,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-3.0, type=float)
+parser.add_argument('--policy_var', default=-3.5, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)          #here we might want to try 1e-4
@@ -267,8 +267,8 @@ for iter in tqdm(range(EPOCHS)):
         writer.add_scalar("squared distance from opt consumption ratio (euler)", euler_gap, iter) 
         writer.add_scalar("pct welfare gain of steady state to current policy (test)", ((vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", ((total_utility-random_util)/random_util)*100 , iter) 
-        writer.add_scalar("pct distance of k to k_ss", (np.abs(avg_state - k_ss)/k_ss)*100, iter)
-        writer.add_scalar("pct distance of c to c_ss", (np.abs(avg_cons - c_ss)/c_ss)*100, iter)
+        writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
+        writer.add_scalar("pct distance of c to c_ss", (np.abs(last_cons - c_ss)/c_ss)*100, iter)
         writer.add_scalar("var action 0 per sim", np.var(all_actions[:, 0]), iter)
         
   
