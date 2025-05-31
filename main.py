@@ -15,7 +15,7 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 # baseline version is now: 2 states, beta = 0.97 and delta = 0.01
 '''CONTROLS'''
-comment = 'SGM_Prepoc3_'
+comment = 'SGM_prepoc3_rho=0.1_'
 #working version
 version = "stochastic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
@@ -39,7 +39,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--n_layers', default=1, type=int)
 parser.add_argument('--n_neurons', default=128, type=int)
 ''' ALGORITHM '''
-parser.add_argument('--policy_var', default=-3.5, type=float)
+parser.add_argument('--policy_var', default=-3.0, type=float)
 parser.add_argument('--epsilon_greedy', default=0.0, type=float)
 parser.add_argument('--gamma', default=ss.beta, type=float)
 parser.add_argument('--lr', default=1e-3, type=float)          #here we might want to try 1e-4
