@@ -9,7 +9,7 @@ from collections import deque
 from steady import steady
 
 
-def state_preprocessor(s, k_ss):
+def state_preprocessor2(s, k_ss):
     if s.ndim == 1:
         return torch.tensor([s[0], s[1] / k_ss])
     else:
@@ -17,8 +17,16 @@ def state_preprocessor(s, k_ss):
         s2 = (s[:, 1] / k_ss).unsqueeze(1) 
         return torch.cat([s1, s2], dim=1)
     
-def state_preprocessor_simple(s):
+def state_preprocessor1(s):
     return s/10 
+
+def state_preprocessor3(s):
+    if s.ndim == 1:
+        return torch.tensor([s[0], s[1] / 10])
+    else:
+        s1 = s[:, 0].unsqueeze(1)
+        s2 = (s[:, 1] / 10).unsqueeze(1) 
+        return torch.cat([s1, s2], dim=1) 
 
 def soft_update(nets, nets_target, tau=0.005):
     for param, target_param in zip(nets.parameters(), nets_target.parameters()):

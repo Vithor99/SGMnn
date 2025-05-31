@@ -15,9 +15,9 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 # baseline version is now: 2 states, beta = 0.97 and delta = 0.01
 '''CONTROLS'''
-comment = 'SGM_oldPrepoc_'
+comment = 'SGM_Prepoc3_'
 #working version
-version = "deterministic" # deterministic ; stochastic  
+version = "stochastic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
