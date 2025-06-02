@@ -18,12 +18,12 @@ from gymnasium.vector import SyncVectorEnv
 comment = '_SGM_'
 #working version
 version = "deterministic" # deterministic ; stochastic  
-initial_k = "random"      # steady ; random 
+initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
 T_test = 550
 T_train = 550
-frq_test = 500 
+frq_test = 5 
 EPOCHS = 45000
 
 plot_histogram = 0 #1 plots the action dist conitional on steady state 
@@ -245,36 +245,45 @@ for iter in tqdm(range(EPOCHS)):
         if best_utility < total_utility:
             best_utility = total_utility
 
+            #1
             with open("last_sim.pkl", "wb") as f:
                 pickle.dump(last_sim, f)
 
+            #2
             agent.save("SGM_"+ str(model_type))
 
-    if plot_histogram == 1: 
-        if iter % 12 == 12-1:
-            st, _ = test_sim.reset(options="steady") 
-            rnd_state0 = st[1]
-
-
+            #3
+            st = np.array([1, k_ss]) 
             st_tensor = torch.from_numpy(st).float().to(device)
             with torch.no_grad():
-                sample0 = agent.get_dist(st_tensor)
+                sample1 = agent.get_dist(st_tensor)
+            with open("sample1.pkl", "wb") as f:
+                pickle.dump(sample1, f)
 
-                # Create a figure with two subplots
-                plt.subplot(2, 1, 1)
-                plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
-                plt.axvline(c_ss/y_ss, color='r', linestyle='--', label='c')
-                plt.title("Histogram of c/y")
-                plt.xlabel("Value")
-                plt.ylabel("Density")
-                plt.xlim(0, 1)
+    
+    if iter == 1:
+        st = np.array([1, k_ss]) 
+        st_tensor = torch.from_numpy(st).float().to(device)
+        with torch.no_grad():
+            sample0 = agent.get_dist(st_tensor)
+        with open("sample0.pkl", "wb") as f:
+            pickle.dump(sample0, f)
 
-                # Adjust layout and display the plots
-                plt.tight_layout()
-                plt.draw()
-                plt.pause(1)
-                if (iter // 12) % 4 == 3:
-                    plt.clf() 
+        """ # Create a figure with two subplots
+        plt.subplot(2, 1, 1)
+        plt.hist(sample0, bins=50, density=True, alpha=0.6, color='blue')
+        plt.axvline(c_ss/y_ss, color='r', linestyle='--', label='c')
+        plt.title("Histogram of c/y")
+        plt.xlabel("Value")
+        plt.ylabel("Density")
+        plt.xlim(0, 1)
+
+        # Adjust layout and display the plots
+        plt.tight_layout()
+        plt.draw()
+        plt.pause(1)
+        if (iter // 12) % 4 == 3:
+            plt.clf()  """
        
 
 
