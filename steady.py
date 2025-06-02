@@ -122,6 +122,16 @@ class steady:
             r1 = Z[1]  # since Pi[1, 1] = 1, always stays in regime 1
         return r1
     
+    def next_regime_prob(self, r): 
+        Z, Pi = self.regimes()
+        if r == 1:
+            #r1 = np.random.choice([Z[0], Z[1]], p=[Pi[0, 0], Pi[0, 1]])
+            pi = Pi[0,:]
+        else:
+            pi = Pi[1,:]
+        return pi
+
+    
 
     
 #ss = steady()
