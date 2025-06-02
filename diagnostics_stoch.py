@@ -18,33 +18,22 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic.pkl'
+rl_model = 'SGM_prepoc2_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_stochastic_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
-zoom = "in" #this needs to be adjusted
+#zoom = "in" #this needs to be adjusted
 
 run_simulation = "no" #if yes it runs the simulation
-if run_simulation == "yes":
-    T = 500
-    dev = 0 #Pct initial deviation from steady state
-    zoom = "in" # in or out: if out zoom factor is activated 
-    zoom_factor = 10 # if zoom == "out": pct band around ss that we want to visualize
-    run_foc = "yes" # if yes it runs the focs of the model
-    n = 200 # number of periods to compute the steady state of the simulation
 
 run_policy = "no" # if yes it runs the policy evaluation
-if run_policy == "yes":
-    dev = 5
-    N = 500
 
-run_irfs = "yes"
-if run_irfs == "yes": 
-    dev = 5 
-    N = 500
+run_irfs = "no"
 
-run_add_analysis = "no" # if yes it runs some other stuff
+global_policy = "yes" #needs to be run with appropriate grid solution
+
+#run_add_analysis = "no" # if yes it runs some other stuff
 
 
 '''LOADING RL MODEL'''
@@ -67,6 +56,7 @@ parser.add_argument('--use_hard_bounds', default=1, type=int)
 parser.add_argument('--n_workers', default=4, type=int)
 args = parser.parse_args()
 device = torch.device('cpu')
+
 ''' Define Simulator'''
 c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
 s_ratio_ss = 1 - (c_ss/y_ss)
@@ -97,6 +87,7 @@ agent.eval()
 ''' COMPUTING THE STEADY STATE OF RL'''
 k_rl = k_ss
 K = np.zeros(1000)
+C = np.zeros(1000)
 for t in range(1000):
     #RL 
     state_rl = torch.from_numpy(np.array([1, k_rl])).float().to(device)
@@ -104,9 +95,12 @@ for t in range(1000):
         action_tensor, _ = agent.get_action(state_rl, test=True)
         sratio_rl = action_tensor.squeeze().numpy()
     k1_rl = (1 - ss.delta)*k_rl + (k_rl**ss.alpha) * sratio_rl
+    c_rl = (k_rl**ss.alpha) * (1 - sratio_rl)
     K[t] = k1_rl
+    C[t] = c_rl
     k_rl = k1_rl
 k_ss_rl = np.mean(K[-100:])
+c_ss_rl = np.mean(C[-100:])
 
         
 
@@ -138,12 +132,14 @@ optimal_c = interp2d((zgrid, k), c_star.T)
 ''' SIMULATION '''
 if run_simulation == "yes":
     # RL, Grid
-    #st = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    foc = "yes"
+    dev = 0
+    T = 500
     st = np.array([k_ss_rl*(1+(dev/100)), k_ss*(1+(dev/100))])
     z = 1 #we want the same series for productivity in the two economies
-    #z_psx = int(np.where(zgrid == 1)[0])
     grid_sim={}
     rl_sim={}
+    foc_sim={}
     grid_v = 0
     rl_v = 0
     #labour_gap = np.zeros((T-1, 2))
@@ -187,17 +183,22 @@ if run_simulation == "yes":
                     'u': u_grid,
                     'st1': k1_grid}
         
-
-        """ if run_foc == "yes":
-            if t>0:
-                e_gap_grid = ss.foc_log(grid_sim[t-1]['c'], grid_sim[t]['c'],  
-                                        z, grid_sim[t]['k'])
-                
-                e_gap_rl = ss.foc_log(rl_sim[t-1]['c'], rl_sim[t]['c'],  
-                                        z, rl_sim[t]['k'])
-                #labour_gap[t-1, 1] = l_gap
-                euler_gap[t-1, 0] = e_gap_rl
-                euler_gap[t-1, 1] = e_gap_grid """
+        if foc == "yes": 
+            mu0 = 1/c_rl
+            mu1 = np.zeros(ss.nbz)
+            Z, Pi = ss.tauchenhussey_local(ss.nbz, z)
+            for i in range(ss.nbz): 
+                with torch.no_grad():
+                    st_tensor_foc = torch.from_numpy(np.array([Z[i], k1_rl])).float().to(device)
+                    action_tensor_foc, _ = agent.get_action(st_tensor_foc, test=True)
+                    a_foc = action_tensor_foc.squeeze().numpy()
+                    y = Z[i]* (k1_rl**ss.alpha)
+                    c1 = y * (1-a_foc)
+                    mu1[i] = 1/c1
+            r1 = (1-ss.delta) + Z * ss.alpha * (k1_rl**(ss.alpha-1))
+            EPS = np.sum(Pi * (mu1*r1))
+            euler_gap = (mu0 - ss.beta * EPS)**2
+            foc_sim[t] = {'resid': euler_gap}
         
         while True:
             z1 = (1 - ss.rhoa) + ss.rhoa * z + np.random.normal(0, ss.dev_eps_z)
@@ -222,12 +223,11 @@ if run_simulation == "yes":
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(k_grid, color='blue', linewidth=1.5, label='Grid')
     ax.plot(k_rl, color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--',label='Steady State')
+    ax.axhline(k_ss, color="blue", linewidth=1.2, linestyle='--',label='Steady State')
+    ax.axhline(k_ss_rl, color="crimson", linewidth=1.2, linestyle='--',label='Steady State RL')
     ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
     ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -251,12 +251,11 @@ if run_simulation == "yes":
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(c_grid, color='blue', linewidth=1.5, label='Grid')
     ax.plot(c_rl, color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss_rl, color="crimson", linewidth=1.2, linestyle='--',label='Steady State RL')
     ax.set_title("Consumption", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
     ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -265,6 +264,24 @@ if run_simulation == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = folder + rl_model.replace('.pt', '_consumption.png')
+    fig.savefig(plot_path)
+
+    # Plotting Euler residuals 
+    resids = [entry['resid'] for entry in foc_sim.values()]
+
+    fig, ax = plt.subplots(figsize=(5, 6))  
+    ax.plot(resids, color='blue', linewidth=1.5, label='Grid')
+    ax.set_title("Euler residuals", fontsize=16)
+    ax.set_xlabel("Periods", fontstyle='italic')         
+    ax.set_ylabel(r'$Euler Residuals$', fontstyle='italic')
+    #ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                          
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_euler.png')
     fig.savefig(plot_path)
 
 
@@ -276,29 +293,31 @@ if run_simulation == "yes":
 
 ''' POLICY EVALUATION STOCHASTIC'''
 if run_policy == "yes":
-    c_values_grid = np.zeros((N, ss.nbz))
-    n_values_grid = np.zeros((N, ss.nbz))
-    k1_values_grid = np.zeros((N, ss.nbz))
-    v_values_grid = np.zeros((N, ss.nbz))
-    c_values_rl = np.zeros((N, ss.nbz))
-    n_values_rl = np.zeros((N, ss.nbz))
-    k1_values_rl = np.zeros((N, ss.nbz))
-    v_values_rl = np.zeros((N, ss.nbz))
+    N = 200
+    dev = 5
+    zgrid_small = np.array([zgrid[2], zgrid[5], zgrid[8]])
+
+    c_values_grid = np.zeros((N, len(zgrid_small)))
+    k1_values_grid = np.zeros((N, len(zgrid_small)))
+    v_values_grid = np.zeros((N, len(zgrid_small)))
+    c_values_rl = np.zeros((N, len(zgrid_small)))
+    k1_values_rl = np.zeros((N, len(zgrid_small)))
+    v_values_rl = np.zeros((N, len(zgrid_small)))
 
 
     k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
     #z_psx = int(np.where(zgrid == 1)[0])
-    for j in range(len(zgrid)): 
+    for j in range(len(zgrid_small)): 
         for i in range(len(k_values)):
             #RL 
-            st = np.array([zgrid[j], k_values[i]])
+            st = np.array([zgrid_small[j], k_values[i]])
             state = torch.from_numpy(st).float().to(device)
             with torch.no_grad():
                 action_tensor, _ = agent.get_action(state, test=True)
                 action_rl = action_tensor.squeeze().numpy()
                 value_tensor = agent.get_value(state)
                 value_rl = value_tensor.numpy()
-            y_rl = zgrid[j] * (k_values[i]**ss.alpha)
+            y_rl = zgrid_small[j] * (k_values[i]**ss.alpha)
             c_rl = (1 - action_rl) * y_rl
             k1_rl = (1 - ss.delta)*k_values[i] + action_rl * y_rl
             v_rl = float(value_rl)
@@ -319,7 +338,7 @@ if run_policy == "yes":
 
         # How much the RL policy deviates from Grid for a 5% deviation from steady state
         p = len(k_values)-1
-        z_diff = (zgrid[j] - 1)
+        z_diff = (zgrid_small[j] - 1)
         k_diff = (k_values[p] - k_ss) / np.abs(k_ss)
         c_diff = (c_values_rl[p, j] - c_values_grid[p, j]) / np.abs(c_values_grid[p, j])
         #n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
@@ -347,6 +366,30 @@ if run_policy == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = folder + rl_model.replace('.pt', '_cons_rule.png')
+    fig.savefig(plot_path)
+
+    #Transition 
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, k1_values_rl[:, :], color = 'crimson', linewidth=1.5, label='RL')
+    ax.plot(k_values, k1_values_grid[:, :], color = 'blue',  linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, k_ss, color='blue', label='Steady State', s=20, zorder=5)
+    ax.scatter(k_ss_rl, k_ss_rl, color='crimson', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1)
+    ax.axhline(k_ss, color='blue', linestyle=':', linewidth=1)
+    ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    ax.axhline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    ax.plot(k_values, k_values, color='black', linestyle=':', linewidth=1)
+    ax.set_title("Transition Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$k_{t+1}$', fontstyle='italic')
+    #ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+    
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_global_transition.png')
     fig.savefig(plot_path)
 
 
@@ -406,8 +449,6 @@ if run_irfs == 'yes':
     ax.set_title("Consumption to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
     ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -426,8 +467,6 @@ if run_irfs == 'yes':
     ax.set_title("Capital to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
     ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -490,8 +529,6 @@ if run_irfs == 'yes':
     ax.set_title("Consumption to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(c_ss*(1-(zoom_factor/100)), c_ss*(1+(zoom_factor/100)))
     ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -510,8 +547,6 @@ if run_irfs == 'yes':
     ax.set_title("Capital to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    if zoom == "out":
-        ax.set_ylim(k_ss*(1-(zoom_factor/100)), k_ss*(1+(zoom_factor/100)))
     ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -523,3 +558,83 @@ if run_irfs == 'yes':
     fig.savefig(plot_path)
 
     
+''' GLOBAL POLICY'''
+
+if global_policy == "yes":
+    N = 200
+    zgrid_small = np.array([zgrid[2], zgrid[5], zgrid[8]])
+    c_values_grid = np.zeros((N, len(zgrid_small)))
+    k1_values_grid = np.zeros((N, len(zgrid_small)))
+    v_values_grid = np.zeros((N, len(zgrid_small)))
+    c_values_rl = np.zeros((N, len(zgrid_small)))
+    k1_values_rl = np.zeros((N, len(zgrid_small)))
+    v_values_rl = np.zeros((N, len(zgrid_small)))
+
+    #zgrid_small = np.array([zgrid[2], zgrid[5], zgrid[8]])
+
+    k_values = np.linspace(1 , k_ss * (1.05), N)
+    #z_psx = int(np.where(zgrid == 1)[0])
+    for j in range(len(zgrid_small)): 
+        for i in range(len(k_values)):
+            #RL 
+            st = np.array([zgrid_small[j], k_values[i]])
+            state = torch.from_numpy(st).float().to(device)
+            with torch.no_grad():
+                action_tensor, _ = agent.get_action(state, test=True)
+                action_rl = action_tensor.squeeze().numpy()
+                value_tensor = agent.get_value(state)
+                value_rl = value_tensor.numpy()
+            y_rl = zgrid_small[j] * (k_values[i]**ss.alpha)
+            c_rl = (1 - action_rl) * y_rl
+            k1_rl = (1 - ss.delta)*k_values[i] + action_rl * y_rl
+            v_rl = float(value_rl)
+
+            #Grid 
+            c_grid = optimal_c(st)
+            k1_grid = optimal_k1(st)
+            v_grid = optimal_v(st)
+
+            #save 
+            c_values_grid[i,j] = c_grid
+            c_values_rl[i,j] = c_rl
+            k1_values_grid[i,j] = k1_grid
+            k1_values_rl[i,j] = k1_rl 
+            v_values_grid[i,j] = v_grid
+            v_values_rl[i,j] = v_rl
+
+
+        # How much the RL policy deviates from Grid for a 5% deviation from steady state
+        p = len(k_values)-1
+        z_diff = (zgrid_small[j] - 1)
+        k_diff = (k_values[p] - k_ss) / np.abs(k_ss)
+        c_diff = (c_values_rl[p, j] - c_values_grid[p, j]) / np.abs(c_values_grid[p, j])
+        #n_diff = (n_values[p, 0] - n_values[p, 1]) / np.abs(n_values[p, 1])
+        print(f"Consumption deviation from grid policy for a {k_diff *100}% k deviation and a {z_diff *100}% z deviation: {c_diff*100:.2f}%")
+        #print(f"Labour deviation from grid policy for a {k_diff *100}% k deviation: {n_diff*100:.2f}%")
+
+
+
+    #plotting
+    #consumption
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, c_values_rl[:, :], color = 'crimson', linewidth=1.5, label='RL')
+    ax.plot(k_values, c_values_grid[:, :], color = 'blue',  linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, c_ss, color='blue', label='Steady State', s=20, zorder=5)
+    ax.scatter(k_ss_rl, c_ss_rl, color='crimson', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1)
+    ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1)
+    ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    ax.set_title("Consumption Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$c_t$', fontstyle='italic')
+    #ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+    
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_global_policy.png')
+    fig.savefig(plot_path)
+
