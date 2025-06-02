@@ -18,20 +18,20 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_prepoc2_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic_global.pkl'
+rl_model = 'SGM_prepoc3_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_stochastic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
 
-run_simulation = "no" #if yes it runs the simulation
+run_simulation = "yes" #if yes it runs the simulation
 
-run_policy = "no" # if yes it runs the policy evaluation
+run_policy = "yes" # if yes it runs the policy evaluation
 
-run_irfs = "no"
+run_irfs = "yes"
 
-global_policy = "yes" #needs to be run with appropriate grid solution
+global_policy = "no" #needs to be run with appropriate grid solution
 
 #run_add_analysis = "no" # if yes it runs some other stuff
 
@@ -273,7 +273,7 @@ if run_simulation == "yes":
     ax.plot(resids, color='blue', linewidth=1.5, label='Grid')
     ax.set_title("Euler residuals", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
-    ax.set_ylabel(r'$Euler Residuals$', fontstyle='italic')
+    ax.set_ylabel(r'$Euler \ \ Residuals$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
@@ -294,7 +294,7 @@ if run_simulation == "yes":
 ''' POLICY EVALUATION STOCHASTIC'''
 if run_policy == "yes":
     N = 200
-    dev = 5
+    dev = 10
     zgrid_small = np.array([zgrid[2], zgrid[5], zgrid[8]])
 
     c_values_grid = np.zeros((N, len(zgrid_small)))
@@ -350,15 +350,18 @@ if run_policy == "yes":
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, c_values_rl[:, :],  linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values_grid[:, :], linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, c_ss, color='black', label='Steady State', s=20, zorder=5)
-    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
-    ax.axhline(c_ss, color='black', linestyle=':', linewidth=1)
+    ax.plot(k_values, c_values_rl[:, :], color = "crimson",  linewidth=1.5, label='RL')
+    ax.plot(k_values, c_values_grid[:, :], color = "blue", linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, c_ss, color='blue', label='Steady State', s=20, zorder=5)
+    ax.scatter(k_ss_rl, c_ss_rl, color='crimson', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1)
+    ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1)
+    ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -445,11 +448,12 @@ if run_irfs == 'yes':
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(irf_c[:,1], color='blue', linewidth=1.5, label='Grid')
     ax.plot(irf_c[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Consumption to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -463,11 +467,12 @@ if run_irfs == 'yes':
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(irf_k[:,1], color='blue', linewidth=1.5, label='Grid')
     ax.plot(irf_k[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(k_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(k_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Capital to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -525,11 +530,12 @@ if run_irfs == 'yes':
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(irf_c[:,1], color='blue', linewidth=1.5, label='Grid')
     ax.plot(irf_c[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Consumption to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -543,11 +549,12 @@ if run_irfs == 'yes':
     fig, ax = plt.subplots(figsize=(5, 6))  
     ax.plot(irf_k[:,1], color='blue', linewidth=1.5, label='Grid')
     ax.plot(irf_k[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(k_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(k_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Capital to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
