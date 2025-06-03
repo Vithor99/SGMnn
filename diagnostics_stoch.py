@@ -18,20 +18,29 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_prepoc3_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic.pkl'
+rl_model = 'SGM_prepoc1_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_stochastic_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
+run_local = "no"
+global_policy = "yes" #needs to be run with appropriate grid solution 
 
-run_simulation = "yes" #if yes it runs the simulation
+if run_local == "yes":
+    run_simulation = "yes" #if yes it runs the simulation
 
-run_policy = "yes" # if yes it runs the policy evaluation
+    run_policy = "yes" # if yes it runs the policy evaluation
 
-run_irfs = "yes"
+    run_irfs = "yes"
+else:
+    run_simulation = "no" #if yes it runs the simulation
 
-global_policy = "no" #needs to be run with appropriate grid solution
+    run_policy = "no" # if yes it runs the policy evaluation
+
+    run_irfs = "no"
+
+
 
 #run_add_analysis = "no" # if yes it runs some other stuff
 
