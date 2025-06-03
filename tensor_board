@@ -9,6 +9,7 @@ rm -r ./logs/"name"
 #Commands useful in SSH
 sbatch main.slurm  # runs main file 
 squeue -u vreichlin # check job is running 
+squeue -p Macro 
 tail -f main.out   # follow run time on ssh
 scancel 123456     #cancels job
 
