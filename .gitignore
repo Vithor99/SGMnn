@@ -16,6 +16,7 @@ SGM_plots/
 saved_models/
 sync_models.sh
 old_logs/
+action_dist/
 
 
 
