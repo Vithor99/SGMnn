@@ -21,7 +21,7 @@ version = "regime"
 initial_k = "steady"      # steady ; random 
 var_k0 = 1                #Pct deviation from ss capital
 
-run_EulerResid = "no"
+run_EulerResid = "yes"
 
 T_test = 550
 T_train = 550
@@ -81,7 +81,9 @@ s_ratio_ss = 1 - (c_ss/y_ss)
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
-
+nbr = ss.nbr
+rgrid = ss.regimes()[0]   # Discretized z values
+Pi = ss.regimes()[1]      # Transition probabilities
 tau = ss.tau
 pi_tau = ss.pi_tau
 
@@ -218,35 +220,24 @@ for iter in tqdm(range(EPOCHS)):
                     
                     if run_EulerResid == "yes":
                         #distance from FOC
-                        if version == 'deterministic': 
-                            if t>0:
-                                k1 = last_sim[t]['st'][1]
-                                z0 = last_sim[t-1]['st'][0]
-                                #E_z1 = (1-ss.rhoa) + ss.rhoa * z0
-                                c0 = last_sim[t-1]['c']
-                                c1 = last_sim[t]['c']
-                                c_ratio_star = ss.beta*((1 - ss.delta) + ss.alpha * ((k1)**(ss.alpha-1)) )
-                                c_ratio = c1/c0
-                                #euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
-                                euler_gap += (c_ratio - c_ratio_star)**2
-                        else: 
-                            k1 = last_sim[t]['st1'][1]
-                            z0 = last_sim[t]['st'][0]
-                            c0 = last_sim[t]['c']
-                            mu0 = 1/c0
-                            mu1 = np.zeros(ss.nbz)
-                            Z, Pi = ss.tauchenhussey_local(ss.nbz, z0)
-                            for i in range(ss.nbz): 
-                                with torch.no_grad():
-                                    st_tensor_foc = torch.from_numpy(np.array([Z[i], k1])).float().to(device)
-                                    action_tensor_foc, _ = agent.get_action(st_tensor_foc, test=True)
-                                    a_foc = action_tensor_foc.squeeze().numpy()
-                                    y = Z[i]* (k1**ss.alpha)
-                                    c1 = y * (1-a_foc)
-                                    mu1[i] = 1/c1
-                            r1 = (1-ss.delta) + Z * ss.alpha * (k1**(ss.alpha-1))
-                            EPS = np.sum(Pi * (mu1*r1))
-                            euler_gap += (mu0 - ss.beta * EPS)**2 
+                        k1 = last_sim[t]['st1'][1]
+                        r = last_sim[t]['st'][0]
+                        c0 = last_sim[t]['c']
+                        mu0 = 1/c0
+                        mu1 = np.zeros(ss.nbr)
+                        pi = ss.next_regime_prob(r)
+                        #Z, Pi = ss.tauchenhussey_local(ss.nbz, z0)
+                        for i in range(ss.nbr): 
+                            with torch.no_grad():
+                                st_tensor_foc = torch.from_numpy(np.array([rgrid[i], k1])).float().to(device)
+                                action_tensor_foc, _ = agent.get_action(st_tensor_foc, test=True)
+                                a_foc = action_tensor_foc.squeeze().numpy()
+                                y = rgrid[i]* (k1**ss.alpha)
+                                c1 = y * (1-a_foc)
+                                mu1[i] = 1/c1
+                        R1 = (1-ss.delta) + rgrid * ss.alpha * (k1**(ss.alpha-1))
+                        EPS = np.sum(pi * (mu1*R1))
+                        euler_gap += (mu0 - ss.beta * EPS)**2 
                     
                     #average distance from ss
                     if t==T_test-1:
