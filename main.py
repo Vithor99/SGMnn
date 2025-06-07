@@ -210,12 +210,13 @@ for iter in tqdm(range(EPOCHS)):
                     if t>0:
                         k1 = last_sim[t]['st'][1]
                         z0 = last_sim[t-1]['st'][0]
-                        E_z1 = (1-ss.rhoa) + ss.rhoa * z0
+                        #E_z1 = (1-ss.rhoa) + ss.rhoa * z0
                         c0 = last_sim[t-1]['c']
                         c1 = last_sim[t]['c']
-                        c_ratio_star = ss.beta*((1 - ss.delta) + E_z1 * ss.alpha * ((k1)**(ss.alpha-1)) )
+                        c_ratio_star = ss.beta*((1 - ss.delta) + ss.alpha * ((k1)**(ss.alpha-1)) )
                         c_ratio = c1/c0
-                        euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+                        #euler_gap += np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+                        euler_gap += (c_ratio - c_ratio_star)**2
                     
                     #final distance from ss
                     if t==T_test-1:

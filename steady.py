@@ -39,10 +39,10 @@ class steady:
         return v_ss 
     
     def foc_log(self, c0, c1, z0, k1):
-        E_z1 = (1-self.rhoa) + self.rhoa * z0
-        c_ratio_star = self.beta*((1 - self.delta) + E_z1 * self.alpha * ((k1)**(self.alpha-1)) )
+        #E_z1 = (1-self.rhoa) + self.rhoa * z0
+        c_ratio_star = self.beta*((1 - self.delta) + z0 * self.alpha * ((k1)**(self.alpha-1)) )
         c_ratio = c1/c0
-        euler_gap = np.abs((c_ratio - c_ratio_star)/c_ratio_star)
+        euler_gap = (c_ratio - c_ratio_star)**2
         return euler_gap
 
     def get_random_util(self, z, k):

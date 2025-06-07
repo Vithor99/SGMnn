@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 '''CONTROLS'''
-rl_model = 'SGM_prepoc1_steady_deterministic.pt' 
+rl_model = 'SGM_steady_deterministic.pt' 
 grid_model = 'Grid_SGM_deterministic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
