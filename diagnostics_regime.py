@@ -381,10 +381,10 @@ if run_policy == "yes":
     
     """ ax.plot(k_values, c_values_rl[:, :], color = "crimson",  linewidth=1.5, label='RL')
     ax.plot(k_values, c_values_grid[:, :], color = "blue", linewidth=1.5, label='Grid') """
-    ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors=palette[1], s=40, linewidths=1.5)
-    ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors=palette[1], edgecolors=palette[1], s=40, linewidths=1.5)
-    ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='o', facecolors=palette[0], edgecolors=palette[0], s=40, linewidths=1.5)
-    ax.scatter(k_ss_ante, c_ss_ante, marker='o', facecolors='none', edgecolors=palette[0], s=40, linewidths=1.5)
+    ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='D', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_ante, c_ss_ante, marker='D', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     #ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
     #ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
     #ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1, alpha = 0.5)
@@ -442,7 +442,7 @@ if global_policy == "yes":
 
     #zgrid_small = np.array([zgrid[2], zgrid[5], zgrid[8]])
 
-    k_values = np.linspace(1 , k_ss * (1.05), N)
+    k_values = np.linspace(1 , k_ss * (1.15), N)
     #z_psx = int(np.where(zgrid == 1)[0])
     for j in range(ss.nbr): 
         for i in range(len(k_values)):
@@ -491,8 +491,8 @@ if global_policy == "yes":
     for i in range(len(c_values_rl[0,:])):
         ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, c_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors=palette[1], s=40, linewidths=1.5)
-    ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors=palette[1], edgecolors=palette[1], s=40, linewidths=1.5)
+    ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     #ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='o', facecolors=palette[0], edgecolors=palette[0], s=40, linewidths=1.5)
     #ax.scatter(k_ss_ante, c_ss_ante, marker='o', facecolors='none', edgecolors=palette[0], s=40, linewidths=1.5)
     #ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
