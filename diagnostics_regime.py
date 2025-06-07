@@ -19,17 +19,17 @@ warnings.filterwarnings("ignore")
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
 rl_model = 'SGM_prepoc3_steady_regime.pt' 
-grid_model = 'Grid_SGM_regime.pkl'
+grid_model = 'Grid_SGM_regime_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
 
-run_simulation = "yes" #if yes it runs the simulation
+run_simulation = "no" #if yes it runs the simulation
 
-run_policy = "yes" # if yes it runs the policy evaluation
+run_policy = "no" # if yes it runs the policy evaluation
 
-global_policy = "no" #needs to be run with appropriate grid solution
+global_policy = "yes" #needs to be run with appropriate grid solution
 
 #run_add_analysis = "no" # if yes it runs some other stuff
 
@@ -374,16 +374,21 @@ if run_policy == "yes":
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, c_values_rl[:, :], color = "crimson",  linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values_grid[:, :], color = "blue", linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, c_ss, color='blue', label='Steady State', s=20, zorder=5)
-    ax.scatter(k_ss_rl, c_ss_rl, color='crimson', label='Steady State', s=20, zorder=5)
-    ax.scatter(k_ss_rl_ante, c_ss_rl_ante, color='crimson', marker='s', label='Steady State', s=40, zorder=5)
-    ax.scatter(k_ss_ante, c_ss_ante, color='blue', marker='s', label='Steady State', s=40, zorder=5)
-    ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1)
-    ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1)
-    ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
-    ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    palette = ("#ff6600", "#ffb84d")
+    for i in range(len(c_values_rl[0,:])):
+        ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
+        ax.plot(k_values, c_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
+    
+    """ ax.plot(k_values, c_values_rl[:, :], color = "crimson",  linewidth=1.5, label='RL')
+    ax.plot(k_values, c_values_grid[:, :], color = "blue", linewidth=1.5, label='Grid') """
+    ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors=palette[1], s=40, linewidths=1.5)
+    ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors=palette[1], edgecolors=palette[1], s=40, linewidths=1.5)
+    ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='o', facecolors=palette[0], edgecolors=palette[0], s=40, linewidths=1.5)
+    ax.scatter(k_ss_ante, c_ss_ante, marker='o', facecolors='none', edgecolors=palette[0], s=40, linewidths=1.5)
+    #ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
+    #ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
+    #ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1, alpha = 0.5)
+    #ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1, alpha = 0.5)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
@@ -482,14 +487,18 @@ if global_policy == "yes":
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, c_values_rl[:, :], color = 'crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values_grid[:, :], color = 'blue',  linewidth=1.5, label='Grid')
-    ax.scatter(k_ss, c_ss, color='blue', label='Steady State', s=20, zorder=5)
-    ax.scatter(k_ss_rl, c_ss_rl, color='crimson', label='Steady State', s=20, zorder=5)
-    ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1)
-    ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1)
-    ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
-    ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1)
+    palette = ("#ff6600", "#ffb84d")
+    for i in range(len(c_values_rl[0,:])):
+        ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
+        ax.plot(k_values, c_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors=palette[1], s=40, linewidths=1.5)
+    ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors=palette[1], edgecolors=palette[1], s=40, linewidths=1.5)
+    #ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='o', facecolors=palette[0], edgecolors=palette[0], s=40, linewidths=1.5)
+    #ax.scatter(k_ss_ante, c_ss_ante, marker='o', facecolors='none', edgecolors=palette[0], s=40, linewidths=1.5)
+    #ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
+    #ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1, alpha = 0.5)
+    #ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1, alpha = 0.5)
+    #ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1, alpha = 0.5)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
