@@ -19,20 +19,20 @@ warnings.filterwarnings("ignore")
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
 rl_model = 'SGM_prepoc3_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic.pkl'
+grid_model = 'Grid_SGM_stochastic_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
-run_local = "yes"
-global_policy = "no" #needs to be run with appropriate grid solution 
+run_local = "no"
+global_policy = "yes" #needs to be run with appropriate grid solution 
 
 if run_local == "yes":
-    run_simulation = "no" #if yes it runs the simulation
+    run_simulation = "yes" #if yes it runs the simulation
 
     run_policy = "yes" # if yes it runs the policy evaluation
 
-    run_irfs = "no"
+    run_irfs = "yes"
 else:
     run_simulation = "no" #if yes it runs the simulation
 
@@ -97,6 +97,7 @@ agent.eval()
 k_rl = k_ss
 K = np.zeros(1000)
 C = np.zeros(1000)
+U = np.zeros(1000)
 for t in range(1000):
     #RL 
     state_rl = torch.from_numpy(np.array([1, k_rl])).float().to(device)
@@ -105,11 +106,15 @@ for t in range(1000):
         sratio_rl = action_tensor.squeeze().numpy()
     k1_rl = (1 - ss.delta)*k_rl + (k_rl**ss.alpha) * sratio_rl
     c_rl = (k_rl**ss.alpha) * (1 - sratio_rl)
+    u_rl = np.log(c_rl)
     K[t] = k1_rl
     C[t] = c_rl
+    U[t] = u_rl
     k_rl = k1_rl
 k_ss_rl = np.mean(K[-100:])
 c_ss_rl = np.mean(C[-100:])
+u_ss_rl = np.mean(U[-100:])
+v_ss_rl = (u_ss_rl / (1 - ss.beta))
 
         
 
@@ -359,19 +364,12 @@ if run_policy == "yes":
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
-    #fig, ax = plt.subplots(figsize=(5, 6))
     palette = ("#e65300", "#ff6600", 	"#ff9440", "#ffb84d", "#ffe0b3")
     for i in range(len(c_values_rl[0,:])):
         ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, c_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
-    #ax.plot(k_values, c_values_rl[:, :], color = "crimson",  linewidth=1.5, label='RL')
-    #ax.plot(k_values, c_values_grid[:, :], color = "blue", linewidth=1.5, label='Grid')
     ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors= '#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.axvline(k_ss, color='blue', linestyle=':', linewidth=1)
-    #ax.axhline(c_ss, color='blue', linestyle=':', linewidth=1)
-    #ax.axvline(k_ss_rl, color='crimson', linestyle=':', linewidth=1)
-    #ax.axhline(c_ss_rl, color='crimson', linestyle=':', linewidth=1)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
@@ -385,7 +383,27 @@ if run_policy == "yes":
     plot_path = folder + rl_model.replace('.pt', '_cons_rule.png')
     fig.savefig(plot_path)
 
-    #Transition 
+    #value
+    fig, ax = plt.subplots(figsize=(5, 6))
+    palette = ("#e65300", "#ff6600", 	"#ff9440", "#ffb84d", "#ffe0b3")
+    for i in range(len(v_values_rl[0,:])):
+        ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
+        ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, v_ss, marker='o', facecolors='none', edgecolors= '#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_rl, v_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.set_title("Value function", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$v_t$', fontstyle='italic')
+    #ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+    
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_value_rule.png')
+    fig.savefig(plot_path)
+    """ #Transition 
     fig, ax = plt.subplots(figsize=(5, 6))
     ax.plot(k_values, k1_values_rl[:, :], color = 'crimson', linewidth=1.5, label='RL')
     ax.plot(k_values, k1_values_grid[:, :], color = 'blue',  linewidth=1.5, label='Grid')
@@ -407,7 +425,7 @@ if run_policy == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = folder + rl_model.replace('.pt', '_global_transition.png')
-    fig.savefig(plot_path)
+    fig.savefig(plot_path) """
 
 
 ''' IRFs '''
@@ -656,5 +674,26 @@ if global_policy == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = folder + rl_model.replace('.pt', '_global_policy.png')
+    fig.savefig(plot_path)
+
+     #value
+    fig, ax = plt.subplots(figsize=(5, 6))
+    palette = ("#e65300", "#ff6600", 	"#ff9440", "#ffb84d", "#ffe0b3")
+    for i in range(len(v_values_rl[0,:])):
+        ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
+        ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, v_ss, marker='o', facecolors='none', edgecolors= '#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_rl, v_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.set_title("Value function", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$v_t$', fontstyle='italic')
+    #ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+    
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_global_value.png')
     fig.savefig(plot_path)
 
