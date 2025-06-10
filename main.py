@@ -16,6 +16,8 @@ from gymnasium.vector import SyncVectorEnv
 # baseline version is now: 2 states, beta = 0.97 and delta = 0.01
 '''CONTROLS'''
 comment = 'SGM_prepoc3_'
+#comment = 'SGM_debug_'
+
 #working version
 version = "regime" 
 initial_k = "steady"      # steady ; random 
