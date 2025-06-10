@@ -28,9 +28,9 @@ run_local = "no"
 global_policy = "yes" #needs to be run with appropriate grid solution 
 
 if run_local == "yes":
-    run_simulation = "yes" #if yes it runs the simulation
+    run_simulation = "no" #if yes it runs the simulation
 
-    run_policy = "yes" # if yes it runs the policy evaluation
+    run_policy = "no" # if yes it runs the policy evaluation
 
     run_irfs = "yes"
 else:
@@ -235,14 +235,14 @@ if run_simulation == "yes":
     print(f"Capital distance from steady state: {ss_dev*100:.2f}%") """
     
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(k_grid, color='blue', linewidth=1.5, label='Grid')
-    ax.plot(k_rl, color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(k_ss, color="blue", linewidth=1.2, linestyle='--',label='Steady State')
-    ax.axhline(k_ss_rl, color="crimson", linewidth=1.2, linestyle='--',label='Steady State RL')
+    ax.plot(k_grid, color='#003f5c', linewidth=1.5, label='Grid')
+    ax.plot(k_rl, color="#ff6600", linewidth=1.5, label='RL')
+    ax.axhline(k_ss, color='#003f5c', linewidth=1.2, linestyle='--',label='Steady State')
+    ax.axhline(k_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
     ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -263,14 +263,14 @@ if run_simulation == "yes":
     print(f"Consumption distance from steady state: {ss_dev*100:.2f}%") """
 
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(c_grid, color='blue', linewidth=1.5, label='Grid')
-    ax.plot(c_rl, color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(c_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.axhline(c_ss_rl, color="crimson", linewidth=1.2, linestyle='--',label='Steady State RL')
+    ax.plot(c_grid, color='#003f5c', linewidth=1.5, label='Grid')
+    ax.plot(c_rl, color="#ff6600", linewidth=1.5, label='RL')
+    ax.axhline(c_ss, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
     ax.set_title("Consumption", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -284,7 +284,7 @@ if run_simulation == "yes":
     resids = [entry['resid'] for entry in foc_sim.values()]
 
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(resids, color='blue', linewidth=1.5, label='Grid')
+    ax.plot(resids, color='#003f5c', linewidth=1.5, label='Grid')
     ax.set_title("Euler residuals", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$Euler \ \ Residuals$', fontstyle='italic')
@@ -437,24 +437,42 @@ if run_irfs == 'yes':
     irf_k = np.zeros((irf_length, 2))
     irf_v = np.zeros((irf_length, 2))
 
+    irf_ci = np.zeros((irf_length, 100))
+    irf_ki = np.zeros((irf_length, 100))
+
     # z dev 
     z_dev = 0.03  # 1% deviation from steady state
     z0 = 1 + z_dev  # Initial z value
     k0_grid = k_ss
     k0_rl = k_ss_rl
+    k0_rl_i = np.ones(100) *  k_ss_rl
     for t in range(irf_length):
 
         st_rl = np.array([z0, k0_rl])
+        st_rl_i = np.column_stack((np.full_like(k0_rl_i , z0), k0_rl_i))
         state = torch.from_numpy(st_rl).float().to(device)
+        state_i = torch.from_numpy(st_rl_i).float().to(device)
+
         with torch.no_grad():
-            action_tensor, _ = agent.get_action(state, test=True)
+            action_tensor, _ = agent.get_action(state, test=True)          
             action_rl = action_tensor.squeeze().numpy()
             value_tensor = agent.get_value(state)
             value_rl = value_tensor.numpy()
+
+            actions_i = np.zeros(100)
+            for i in range(100):
+                action_i_tens, _ = agent.get_action(state_i[i], test= False)
+                action_i = action_i_tens.squeeze().numpy()
+                actions_i[i] = action_i
+
         y_rl = z0 * (k0_rl**ss.alpha)
         c_rl = (1 - action_rl) * y_rl
         k1_rl = (1 - ss.delta)*k0_rl + action_rl * y_rl
         v_rl = float(value_rl)
+
+        y_rl_i =  z0 * (k0_rl_i**ss.alpha)
+        c_rl_i = (1 - actions_i) * y_rl_i
+        k1_rl_i =  (1 - ss.delta)*k0_rl_i + actions_i * y_rl_i
 
         st_grid = np.array([z0, k0_grid])
         c_grid = float(optimal_c(st_grid))
@@ -469,19 +487,25 @@ if run_irfs == 'yes':
         irf_v[t] = [v_rl, v_grid]
         irf_y[t] = [y_rl, y_grid]
 
+        # Storing the i IRFs 
+        irf_ci[t] = c_rl_i
+        irf_ki[t] = k1_rl_i
+
         # Update z for next period
         z1 = (1 - ss.rhoa) + ss.rhoa * z0 
         z0 = z1
         k0_grid = k1_grid
         k0_rl = k1_rl
+        k0_rl_i = k1_rl_i
         
 
     # Plotting IRFs
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(irf_c[:,1], color='blue', linewidth=1.5, label='Grid')
-    ax.plot(irf_c[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(c_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.axhline(c_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.plot(irf_c[:,1], color='#003f5c', linewidth=1.5, label='Grid')
+    ax.plot(irf_c[:,0], color="#e65300", linewidth=1.5, label='RL', zorder = 5)
+    ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
+    ax.axhline(c_ss, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Consumption to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
@@ -497,10 +521,11 @@ if run_irfs == 'yes':
 
     # Plotting IRFs
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(irf_k[:,1], color='blue', linewidth=1.5, label='Grid')
-    ax.plot(irf_k[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(k_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.axhline(k_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.plot(irf_k[:,1], color='#003f5c', linewidth=1.5, label='Grid')
+    ax.plot(irf_k[:,0], color='#e65300', linewidth=1.5, label='RL', zorder = 5)
+    ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
+    ax.axhline(k_ss, color="#003f5c", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(k_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Capital to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
@@ -514,30 +539,52 @@ if run_irfs == 'yes':
     plot_path = folder + rl_model.replace('.pt', '_IRF_capital_z.png')
     fig.savefig(plot_path)
 
+
+
+
+
     # IRF for Capital deviation
     irf_c = np.zeros((irf_length, 2))
     irf_y = np.zeros((irf_length, 2))
     irf_k = np.zeros((irf_length, 2))
     irf_v = np.zeros((irf_length, 2))
 
+    irf_ci = np.zeros((irf_length, 100))
+    irf_ki = np.zeros((irf_length, 100))
+
      
     #z_dev = 0.03  # 1% deviation from steady state
     z0 = 1 #+ z_dev  # Initial z value
     k0_grid = k_ss * (1 + 0.05)
     k0_rl = k_ss_rl * (1 + 0.05)
+    k0_rl_i = np.ones(100) *  k0_rl
     for t in range(irf_length):
 
         st_rl = np.array([z0, k0_rl])
+        st_rl_i = np.column_stack((np.full_like(k0_rl_i , z0), k0_rl_i))
         state = torch.from_numpy(st_rl).float().to(device)
+        state_i = torch.from_numpy(st_rl_i).float().to(device)
+
         with torch.no_grad():
             action_tensor, _ = agent.get_action(state, test=True)
             action_rl = action_tensor.squeeze().numpy()
             value_tensor = agent.get_value(state)
             value_rl = value_tensor.numpy()
+
+            actions_i = np.zeros(100)
+            for i in range(100):
+                action_i_tens, _ = agent.get_action(state_i[i], test= False)
+                action_i = action_i_tens.squeeze().numpy()
+                actions_i[i] = action_i
+
         y_rl = z0 * (k0_rl**ss.alpha)
         c_rl = (1 - action_rl) * y_rl
         k1_rl = (1 - ss.delta)*k0_rl + action_rl * y_rl
         v_rl = float(value_rl)
+
+        y_rl_i =  z0 * (k0_rl_i**ss.alpha)
+        c_rl_i = (1 - actions_i) * y_rl_i
+        k1_rl_i =  (1 - ss.delta)*k0_rl_i + actions_i * y_rl_i
 
         st_grid = np.array([z0, k0_grid])
         c_grid = float(optimal_c(st_grid))
@@ -552,18 +599,24 @@ if run_irfs == 'yes':
         irf_v[t] = [v_rl, v_grid]
         irf_y[t] = [y_rl, y_grid]
 
+        # Storing the i IRFs 
+        irf_ci[t] = c_rl_i
+        irf_ki[t] = k1_rl_i
+
         # Update z for next period
         z1 = (1 - ss.rhoa) + ss.rhoa * z0 
         z0 = z1
         k0_grid = k1_grid
         k0_rl = k1_rl
+        k0_rl_i = k1_rl_i
 
     # Plotting IRFs
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(irf_c[:,1], color='blue', linewidth=1.5, label='Grid')
-    ax.plot(irf_c[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(c_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.axhline(c_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.plot(irf_c[:,1], color='#003f5c', linewidth=1.5, label='Grid')
+    ax.plot(irf_c[:,0], color="#e65300", linewidth=1.5, label='RL', zorder = 5)
+    ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
+    ax.axhline(c_ss, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(c_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Consumption to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
@@ -579,10 +632,11 @@ if run_irfs == 'yes':
 
     # Plotting IRFs
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(irf_k[:,1], color='blue', linewidth=1.5, label='Grid')
-    ax.plot(irf_k[:,0], color='crimson', linewidth=1.5, label='RL')
-    ax.axhline(k_ss, color="blue", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.axhline(k_ss_rl, color="crimson", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.plot(irf_k[:,1], color='#003f5c', linewidth=1.5, label='Grid')
+    ax.plot(irf_k[:,0], color='#e65300', linewidth=1.5, label='RL', zorder = 5)
+    ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
+    ax.axhline(k_ss, color="#003f5c", linewidth=1.2, linestyle='--', label='Steady State')
+    ax.axhline(k_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Capital to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
