@@ -21,11 +21,11 @@ grid_model = 'Grid_SGM_deterministic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
-run_simulation = "yes" #if yes it runs the simulation
+run_simulation = "no" #if yes it runs the simulation
 
 run_policy = "yes" # if yes it runs the policy evaluation
 
-run_policy_sto = "yes"
+run_policy_sto = "no"
 
 global_policy = "no"
 
@@ -260,7 +260,7 @@ if run_simulation == "yes":
 
     #euler foc
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(euler_gap[:, 0], color='#ff6600', linewidth=1.0, alpha = 0.3,  label='RL')
+    ax.plot(euler_gap[:, 0], color='#003f5c', linewidth=1.0, alpha = 0.3,  label='RL')
     #ax.plot(euler_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
 
     alpha = 0.1  # Smoothing parameter
@@ -269,7 +269,7 @@ if run_simulation == "yes":
     for i in range(1, len(euler_gap[:, 0])):
         smoothed_euler_gap[i] = alpha * euler_gap[i, 0] + (1 - alpha) * smoothed_euler_gap[i - 1]
     
-    ax.plot(smoothed_euler_gap, color='#ff6600', linewidth=1.5, label='Smoothed RL')
+    ax.plot(smoothed_euler_gap, color='#003f5c', linewidth=1.5, label='Smoothed RL')
 
     ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
     ax.set_title("Distance from Euler", fontsize=16)
@@ -392,7 +392,7 @@ if run_policy == "yes":
 
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_value_function.png')
+    plot_path = folder + rl_model.replace('.pt', '_value_function.png')
     fig.savefig(plot_path)
 
 
