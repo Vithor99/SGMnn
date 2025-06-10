@@ -8,15 +8,15 @@ class steady:
         self.delta =  0.01 #0.03 #0.01 #depreciation rate
         self.states = 2    #4
 
-        self.gamma = 1        #consumption pref
-        self.rhoa = 0.9       #AR coff 
-        self.alpha = 0.35     #prduction function
+        self.gamma = 1         #consumption pref
+        self.rhoa = 0.9        #AR coff 
+        self.alpha = 0.35      #prduction function
         self.dev_eps_z = 0.007 #std dev of TFP shock 
         self.actions = 1
-        self.nbz = 11 #dimension of the quadrature
+        self.nbz = 11          #dimension of the quadrature
         self.nbr = 2           # number of regimes 
-        self.tau = 0.95        # tax
-        self.pi_tau = 0.004     # probability that tax s introduced
+        self.tau = 0.99        # tax 
+        self.pi_tau = 0.004    # probability that tax s introduced
 
     
     def equations(self, vars):
