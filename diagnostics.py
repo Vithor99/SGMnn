@@ -112,10 +112,11 @@ optimal_c = interp(k, c_star)
 
 ''' SIMULATION '''
 if run_simulation == "yes":
-    dev = 10
+    dev = 5
     T = 500
     n = 50
     st = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
+    k0_rl_i = np.ones(100) *  k_ss*(1+(dev/100))
     z = 1 #we want the same series for productivity in the two economies
     #z_psx = int(np.where(zgrid == 1)[0])
     grid_sim={}
@@ -124,15 +125,27 @@ if run_simulation == "yes":
     rl_v = 0
     #labour_gap = np.zeros((T-1, 2))
     euler_gap = np.zeros((T-1, 2))
+    irf_ci = np.zeros((T, 100))
+    irf_ki = np.zeros((T, 100))
     
 
     for t in range(T):
         #RL 
         k_rl = st[0]
+        st_rl_i = np.column_stack((np.full_like(k0_rl_i , z), k0_rl_i))
         state = torch.from_numpy(np.array([z, k_rl])).float().to(device)
+        state_i = torch.from_numpy(st_rl_i).float().to(device)
+
         with torch.no_grad():
             action_tensor, _ = agent.get_action(state, test=True)
             sratio_rl = action_tensor.squeeze().numpy()
+
+            actions_i = np.zeros(100)
+            for i in range(100):
+                action_i_tens, _ = agent.get_action(state_i[i], test= False)
+                action_i = action_i_tens.squeeze().numpy()
+                actions_i[i] = action_i
+
         y_rl = z* (k_rl**ss.alpha)
         c_rl = y_rl * (1-sratio_rl)
         u_rl = ss.gamma*np.log(c_rl)
@@ -145,6 +158,13 @@ if run_simulation == "yes":
                     'y': y_rl,
                     'u': u_rl,
                     'st1': k1_rl}
+        
+        y_rl_i = (k0_rl_i**ss.alpha)
+        c_rl_i = (1 - actions_i) * y_rl_i
+        k1_rl_i =  (1 - ss.delta)*k0_rl_i + actions_i * y_rl_i
+        # Storing the i IRFs 
+        irf_ci[t] = c_rl_i
+        irf_ki[t] = k1_rl_i
 
         #Grid 
         # Find the position of the value 1 in zgrid
@@ -174,6 +194,7 @@ if run_simulation == "yes":
             euler_gap[t-1, 1] = e_gap_grid
 
         st = np.array([k1_rl, k1_grid])
+        k0_rl_i = k1_rl_i
         #z1_psx = int(np.random.choice(ss.nbz, p=Pi[z_psx,:]))
         #z_psx = z1_psx
         #z = zgrid[z_psx]
@@ -190,13 +211,14 @@ if run_simulation == "yes":
     print(f"Capital distance from steady state: {ss_dev*100:.2f}%")
     
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(k_grid, color='blue', linewidth=1.5, label='Grid')
-    ax.plot(k_rl, color='crimson', linewidth=1.5, label='RL')
+    ax.plot(k_grid, color='#003f5c', linewidth=1.5, label='Grid', zorder = 4)
+    ax.plot(k_rl, color='#ff6600', linewidth=1.5, label='RL', zorder = 5)
+    ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--',label='Steady State')
     ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -217,13 +239,14 @@ if run_simulation == "yes":
     print(f"Consumption distance from steady state: {ss_dev*100:.2f}%")
 
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(c_grid, color='blue', linewidth=1.5, label='Grid')
-    ax.plot(c_rl, color='crimson', linewidth=1.5, label='RL')
+    ax.plot(c_grid, color='#003f5c', linewidth=1.5, label='Grid', zorder = 4)
+    ax.plot(c_rl, color='#ff6600', linewidth=1.5, label='RL', zorder = 5)
+    ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
     ax.set_title("Consumption", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -237,7 +260,7 @@ if run_simulation == "yes":
 
     #euler foc
     fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(euler_gap[:, 0], color='#F08080', linewidth=1.0, alpha = 0.35,  label='RL')
+    ax.plot(euler_gap[:, 0], color='#ff6600', linewidth=1.0, alpha = 0.3,  label='RL')
     #ax.plot(euler_gap[:, 1], color='blue', linewidth=1.5, label='Grid')
 
     alpha = 0.1  # Smoothing parameter
@@ -246,14 +269,14 @@ if run_simulation == "yes":
     for i in range(1, len(euler_gap[:, 0])):
         smoothed_euler_gap[i] = alpha * euler_gap[i, 0] + (1 - alpha) * smoothed_euler_gap[i - 1]
     
-    ax.plot(smoothed_euler_gap, color='crimson', linewidth=1.5, label='Smoothed RL')
+    ax.plot(smoothed_euler_gap, color='#ff6600', linewidth=1.5, label='Smoothed RL')
 
     ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
     ax.set_title("Distance from Euler", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     #ax.set_ylabel(r'$\% \Delta \ \ \frac{c_{t+1}}{c_t}$', fontstyle='italic')
     ax.set_ylabel("Euler Residuals", fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -313,15 +336,15 @@ if run_policy == "yes":
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, c_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(k_values, c_values[:, 0], color='#ff6600', linewidth=1.5, label='RL', zorder = 4)
+    ax.plot(k_values, c_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, c_ss, color='black', label='Steady State', s=20, zorder=5)
     ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.axhline(c_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -333,7 +356,7 @@ if run_policy == "yes":
 
 
     #capital
-    fig, ax = plt.subplots(figsize=(5, 6))
+    """ fig, ax = plt.subplots(figsize=(5, 6))
     ax.plot(k_values, k1_values[:, 0], color='crimson', linewidth=1.5, label='RL')
     ax.plot(k_values, k1_values[:, 1], color='blue', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, k_ss, color='black', label='Steady State', s=20, zorder=5)
@@ -342,7 +365,7 @@ if run_policy == "yes":
     ax.set_title("Saving Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$k_{t+1}$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -350,19 +373,19 @@ if run_policy == "yes":
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = folder + rl_model.replace('.pt', '_saving_rule.png')
-    fig.savefig(plot_path)
+    fig.savefig(plot_path) """
 
     #value function
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, v_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, v_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(k_values, v_values[:, 0], color='#ff6600', linewidth=1.5, label='RL')
+    ax.plot(k_values, v_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, v_ss, color='black', label='Steady State', s=20, zorder=5)
     ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.axhline(v_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Value Function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$V(k_t)$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -417,15 +440,15 @@ if global_policy == "yes":
     #plotting
     #consumption
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, c_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(k_values, c_values[:, 0], color='#ff6600', linewidth=1.5, label='RL', zorder = 4)
+    ax.plot(k_values, c_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, c_ss, color='black', label='Steady State', s=20, zorder=5)
     ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.axhline(c_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -438,22 +461,22 @@ if global_policy == "yes":
 
     #value function
     fig, ax = plt.subplots(figsize=(5, 6))
-    ax.plot(k_values, v_values[:, 0], color='crimson', linewidth=1.5, label='RL')
-    ax.plot(k_values, v_values[:, 1], color='blue', linewidth=1.5, label='Grid')
+    ax.plot(k_values, v_values[:, 0], color='#ff6600', linewidth=1.5, label='RL', zorder = 4)
+    ax.plot(k_values, v_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, v_ss, color='black', label='Steady State', s=20, zorder=5)
     ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.axhline(v_ss, color='black', linestyle=':', linewidth=1)
     ax.set_title("Value Function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$V(k_t)$', fontstyle='italic')
-    ax.legend()          
+    #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
 
     fig.autofmt_xdate() 
     plt.tight_layout()
-    plot_path = 'plots/' + rl_model.replace('.pt', '_global_value.png')
+    plot_path = folder + rl_model.replace('.pt', '_global_value.png')
     fig.savefig(plot_path)
 
 

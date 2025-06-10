@@ -16,6 +16,7 @@ from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
 comment = '_SGM_'
+comment = '_SGM_debug_'
 #working version
 version = "deterministic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 
