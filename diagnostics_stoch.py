@@ -18,19 +18,19 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_prepoc3_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic_global.pkl'
+rl_model = 'SGM_lowvarper_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_lowvarper_stochastic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
-run_local = "no"
-global_policy = "yes" #needs to be run with appropriate grid solution 
+run_local = "yes"
+global_policy = "no" #needs to be run with appropriate grid solution 
 
 if run_local == "yes":
-    run_simulation = "no" #if yes it runs the simulation
+    run_simulation = "yes" #if yes it runs the simulation
 
-    run_policy = "no" # if yes it runs the policy evaluation
+    run_policy = "yes" # if yes it runs the policy evaluation
 
     run_irfs = "yes"
 else:
@@ -441,8 +441,8 @@ if run_irfs == 'yes':
     irf_ki = np.zeros((irf_length, 100))
 
     # z dev 
-    z_dev = 0.03  # 1% deviation from steady state
-    z0 = 1 + z_dev  # Initial z value
+    # 1% deviation from steady state
+    z0 =  zgrid[9]  # Initial z value
     k0_grid = k_ss
     k0_rl = k_ss_rl
     k0_rl_i = np.ones(100) *  k_ss_rl
