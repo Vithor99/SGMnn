@@ -11,7 +11,7 @@ class steady:
         self.gamma = 1        #consumption pref
         self.rhoa = 0.9       #AR coff 
         self.alpha = 0.35     #prduction function
-        self.dev_eps_z = 0.0035 #std dev of TFP shock 
+        self.dev_eps_z = 0.007 #std dev of TFP shock 
         self.actions = 1
         self.nbz = 11 #dimension of the quadrature
     

@@ -18,8 +18,8 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_lowvar_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic_lowvar.pkl'
+rl_model = 'SGM_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_stochastic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
@@ -285,10 +285,28 @@ if run_simulation == "yes":
 
     # Plotting Euler residuals 
     resids = [entry['resid'] for entry in foc_sim.values()]
+    with open("resids_low.pkl",'rb') as f:
+        resids_low = pickle.load(f)
+    
+    fig, ax = plt.subplots(figsize=(5, 6)) 
 
-    fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(resids, color='#003f5c', linewidth=1.5, label='Grid')
-    ax.set_title("Euler residuals", fontsize=16)
+    alpha = 0.1
+    ax.plot(resids_low, color='#5d95ad', linewidth=1.0, alpha = 0.3,  label='RL')
+    smoothed_euler_gap_low = np.zeros_like(resids)
+    smoothed_euler_gap_low[0] = resids_low[0]
+    for i in range(1, len(resids_low)):
+        smoothed_euler_gap_low[i] = alpha * resids_low[i] + (1 - alpha) * smoothed_euler_gap_low[i - 1]
+    ax.plot(smoothed_euler_gap_low, color='#5d95ad', linewidth=1.5, label='Smoothed RL')
+
+    ax.plot(resids, color='#003f5c', linewidth=1.0, alpha = 0.3,  label='RL')
+    smoothed_euler_gap = np.zeros_like(resids)
+    smoothed_euler_gap[0] = resids[0]
+    for i in range(1, len(resids_low)):
+        smoothed_euler_gap[i] = alpha * resids[i] + (1 - alpha) * smoothed_euler_gap[i - 1]
+    ax.plot(smoothed_euler_gap, color='#003f5c', linewidth=1.5, label='Smoothed RL')
+     
+    
+    #ax.set_title("Euler residuals", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$Euler \ \ Residuals$', fontstyle='italic')
     #ax.legend()          
