@@ -19,20 +19,20 @@ warnings.filterwarnings("ignore")
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
 rl_model = 'SGM_lowvar_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_stochastic_lowvar_global.pkl'
+grid_model = 'Grid_SGM_stochastic_lowvar.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
-run_local = "no"
-global_policy = "yes" #needs to be run with appropriate grid solution 
+run_local = "yes"
+global_policy = "no" #needs to be run with appropriate grid solution 
 
 if run_local == "yes":
     run_simulation = "yes" #if yes it runs the simulation
 
-    run_policy = "yes" # if yes it runs the policy evaluation
+    run_policy = "no" # if yes it runs the policy evaluation
 
-    run_irfs = "yes"
+    run_irfs = "no"
 else:
     run_simulation = "no" #if yes it runs the simulation
 
@@ -234,18 +234,20 @@ if run_simulation == "yes":
     ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
     print(f"Capital distance from steady state: {ss_dev*100:.2f}%") """
     
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(k_grid, color='#003f5c', linewidth=1.5, label='Grid')
     ax.plot(k_rl, color="#ff6600", linewidth=1.5, label='RL')
     ax.axhline(k_ss, color='#003f5c', linewidth=1.2, linestyle='--',label='Steady State')
     ax.axhline(k_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
-    ax.set_title("Capital", fontsize=16)
+    #ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(25.75, 30.25)
+
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -262,18 +264,19 @@ if run_simulation == "yes":
     ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
     print(f"Consumption distance from steady state: {ss_dev*100:.2f}%") """
 
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(c_grid, color='#003f5c', linewidth=1.5, label='Grid')
     ax.plot(c_rl, color="#ff6600", linewidth=1.5, label='RL')
     ax.axhline(c_ss, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
     ax.axhline(c_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
-    ax.set_title("Consumption", fontsize=16)
+    #ax.set_title("Consumption", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(2.8, 3.10)
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -431,7 +434,7 @@ if run_policy == "yes":
 ''' IRFs '''
 # IRFs for consumption, capital, and value function
 if run_irfs == 'yes':
-    irf_length = 500
+    irf_length = 250
     irf_c = np.zeros((irf_length, 2))
     irf_y = np.zeros((irf_length, 2))
     irf_k = np.zeros((irf_length, 2))
@@ -442,7 +445,7 @@ if run_irfs == 'yes':
 
     # z dev 
     # 1% deviation from steady state
-    z0 =  zgrid[9]  # Initial z value
+    z0 =  1.01 #zgrid[9]  # Initial z value
     k0_grid = k_ss
     k0_rl = k_ss_rl
     k0_rl_i = np.ones(100) *  k_ss_rl
@@ -500,19 +503,20 @@ if run_irfs == 'yes':
         
 
     # Plotting IRFs
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(irf_c[:,1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.plot(irf_c[:,0], color="#e65300", linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(c_ss, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
     ax.axhline(c_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.set_title("Consumption to z shock", fontsize=16)
+    #ax.set_title("Consumption to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(2.86, 3.06)
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -520,19 +524,20 @@ if run_irfs == 'yes':
     fig.savefig(plot_path)
 
     # Plotting IRFs
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(irf_k[:,1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.plot(irf_k[:,0], color='#e65300', linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(k_ss, color="#003f5c", linewidth=1.2, linestyle='--', label='Steady State')
     ax.axhline(k_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.set_title("Capital to z shock", fontsize=16)
+    #ax.set_title("Capital to z shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(26.7, 30)
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -611,19 +616,21 @@ if run_irfs == 'yes':
         k0_rl_i = k1_rl_i
 
     # Plotting IRFs
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(irf_c[:,1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.plot(irf_c[:,0], color="#e65300", linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(c_ss, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
     ax.axhline(c_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.set_title("Consumption to k shock", fontsize=16)
+    #ax.set_title("Consumption to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(2.85, 3.18)
+
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -631,19 +638,21 @@ if run_irfs == 'yes':
     fig.savefig(plot_path)
 
     # Plotting IRFs
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(irf_k[:,1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.plot(irf_k[:,0], color='#e65300', linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(k_ss, color="#003f5c", linewidth=1.2, linestyle='--', label='Steady State')
     ax.axhline(k_ss_rl, color="#e65300", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.set_title("Capital to k shock", fontsize=16)
+    #ax.set_title("Capital to k shock", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(26.7, 31)
+
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -709,7 +718,7 @@ if global_policy == "yes":
 
     #plotting
     #consumption
-    fig, ax = plt.subplots(figsize=(5, 6))
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     palette = ("#e65300", "#ff6600", 	"#ff9440", "#ffb84d", "#ffe0b3")
     for i in range(len(c_values_rl[0,:])):
         ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
@@ -718,12 +727,13 @@ if global_policy == "yes":
     #ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors=palette[2], edgecolors=palette[2], s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors= '#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    ax.set_title("Consumption Rule", fontsize=16)
+    #ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')        
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(0.25, 3.5)
     
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -731,20 +741,21 @@ if global_policy == "yes":
     fig.savefig(plot_path)
 
      #value
-    fig, ax = plt.subplots(figsize=(5, 6))
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     palette = ("#e65300", "#ff6600", 	"#ff9440", "#ffb84d", "#ffe0b3")
     for i in range(len(v_values_rl[0,:])):
         ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, v_ss, marker='o', facecolors='none', edgecolors= '#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_rl, v_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    ax.set_title("Value function", fontsize=16)
+    #ax.set_title("Value function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$v_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(12, 40)
     
     fig.autofmt_xdate() 
     plt.tight_layout()
