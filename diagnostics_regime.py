@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_prepoc3_steady_regime.pt' 
+rl_model = 'SGM_steady_regime.pt' 
 grid_model = 'Grid_SGM_regime.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
@@ -27,7 +27,7 @@ folder = 'SGM_plots/'
 
 run_simulation = "yes" #if yes it runs the simulation
 
-run_policy = "yes" # if yes it runs the policy evaluation
+run_policy = "no" # if yes it runs the policy evaluation
 
 global_policy = "no" #needs to be run with appropriate grid solution
 
@@ -269,26 +269,21 @@ if run_simulation == "yes":
     #capital
     k_grid = [entry['k'] for entry in grid_sim.values()]
     k_rl = [entry['k'] for entry in rl_sim.values()]
-
-    """ #distance from steady state
-    rl_ss = np.mean(k_rl[-n:])
-    grid_ss = np.mean(k_grid[-n:])
-    ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
-    print(f"Capital distance from steady state: {ss_dev*100:.2f}%") """
     
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(k_grid, color='#003f5c', linewidth=1.5, label='Grid', zorder = 4)
     ax.plot(k_rl, color='#ff6600', linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(k_ss, color="#003f5c", linewidth=1.2, linestyle='--',label='Steady State')
     ax.axhline(k_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
-    ax.set_title("Capital", fontsize=16)
+    #ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(25, 27.5)
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -299,30 +294,27 @@ if run_simulation == "yes":
     c_grid = [entry['c'] for entry in grid_sim.values()]
     c_rl = [entry['c'] for entry in rl_sim.values()]
 
-    #distance from steady state
-    """ rl_ss = np.mean(c_rl[-n:])
-    grid_ss = np.mean(c_grid[-n:])
-    ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
-    print(f"Consumption distance from steady state: {ss_dev*100:.2f}%") """
-
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))
     ax.plot(c_grid, color='#003f5c', linewidth=1.5, label='Grid', zorder = 4)
     ax.plot(c_rl, color='#ff6600', linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(c_ss, color="#003f5c", linewidth=1.2, linestyle='--', label='Steady State')
     ax.axhline(c_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
-    ax.set_title("Consumption", fontsize=16)
+    #ax.set_title("Consumption", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.set_ylim(2.67, 2.95)
 
     fig.autofmt_xdate() 
     plt.tight_layout()
     plot_path = folder + rl_model.replace('.pt', '_consumption.png')
     fig.savefig(plot_path)
+
+
 
     # Plotting Euler residuals 
     resids = [entry['resid'] for entry in foc_sim.values()]
@@ -558,26 +550,23 @@ if global_policy == "yes":
 
     #plotting
     #consumption
-    fig, ax = plt.subplots(figsize=(5, 6))
+    fig, ax = plt.subplots(figsize=(3.15, 6))
     palette = ("#ff6600", "#ffb84d")
     for i in range(len(c_values_rl[0,:])):
         ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, c_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='o', facecolors=palette[0], edgecolors=palette[0], s=40, linewidths=1.5)
-    #ax.scatter(k_ss_ante, c_ss_ante, marker='o', facecolors='none', edgecolors=palette[0], s=40, linewidths=1.5)
-    #ax.axvline(k_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axvline(k_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
-    ax.set_title("Consumption Rule", fontsize=16)
+    #ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    #ax.set_yticklabels([])
+    ax.set_ylim(0.25, 3.25)
+
     
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -586,26 +575,20 @@ if global_policy == "yes":
 
 
     #value
-    fig, ax = plt.subplots(figsize=(5, 6))
+    fig, ax = plt.subplots(figsize=(3.15, 6))
     palette = ("#ff6600", "#ffb84d")
     for i in range(len(v_values_rl[0,:])):
         ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
-    #ax.scatter(k_ss, v_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.scatter(k_ss_rl, v_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='o', facecolors=palette[0], edgecolors=palette[0], s=40, linewidths=1.5)
-    #ax.scatter(k_ss_ante, c_ss_ante, marker='o', facecolors='none', edgecolors=palette[0], s=40, linewidths=1.5)
-    #ax.axvline(k_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axvline(k_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
-    ax.set_title("Value Function", fontsize=16)
+    #ax.set_title("Value Function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$v_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    #ax.set_yticklabels([])
+    ax.set_ylim(12.5, 37.5)
     
     fig.autofmt_xdate() 
     plt.tight_layout()
