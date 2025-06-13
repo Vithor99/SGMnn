@@ -17,17 +17,17 @@ warnings.filterwarnings("ignore")
 
 '''CONTROLS'''
 rl_model = 'SGM_steady_deterministic.pt' 
-grid_model = 'Grid_SGM_deterministic_global.pkl'
+grid_model = 'Grid_SGM_deterministic.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
-run_simulation = "no" #if yes it runs the simulation
+run_simulation = "yes" #if yes it runs the simulation
 
 run_policy = "no" # if yes it runs the policy evaluation
 
 run_policy_sto = "no"
 
-global_policy = "yes"
+global_policy = "no"
 
 
 '''LOADING MODELS'''
@@ -274,7 +274,7 @@ if run_simulation == "yes":
     ax.plot(smoothed_euler_gap, color='#003f5c', linewidth=1.5, label='Smoothed RL')
 
     ax.axhline(0, color="black", linewidth=1.2, linestyle = '--')
-    ax.set_title("Distance from Euler", fontsize=16)
+    #ax.set_title("Distance from Euler", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     #ax.set_ylabel(r'$\% \Delta \ \ \frac{c_{t+1}}{c_t}$', fontstyle='italic')
     ax.set_ylabel("Euler Residuals", fontstyle='italic')
