@@ -18,14 +18,14 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_lowvarper_steady_stochastic.pt' 
-grid_model = 'Grid_SGM_lowvarper_stochastic.pkl'
+rl_model = 'SGM_lowvar_steady_stochastic.pt' 
+grid_model = 'Grid_SGM_stochastic_lowvar_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
-run_local = "yes"
-global_policy = "no" #needs to be run with appropriate grid solution 
+run_local = "no"
+global_policy = "yes" #needs to be run with appropriate grid solution 
 
 if run_local == "yes":
     run_simulation = "yes" #if yes it runs the simulation
