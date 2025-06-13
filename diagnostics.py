@@ -17,17 +17,17 @@ warnings.filterwarnings("ignore")
 
 '''CONTROLS'''
 rl_model = 'SGM_steady_deterministic.pt' 
-grid_model = 'Grid_SGM_deterministic.pkl'
+grid_model = 'Grid_SGM_deterministic_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 run_simulation = "no" #if yes it runs the simulation
 
-run_policy = "yes" # if yes it runs the policy evaluation
+run_policy = "no" # if yes it runs the policy evaluation
 
 run_policy_sto = "no"
 
-global_policy = "no"
+global_policy = "yes"
 
 
 '''LOADING MODELS'''
@@ -210,18 +210,20 @@ if run_simulation == "yes":
     ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
     print(f"Capital distance from steady state: {ss_dev*100:.2f}%")
     
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(k_grid, color='#003f5c', linewidth=1.5, label='Grid', zorder = 4)
     ax.plot(k_rl, color='#ff6600', linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(k_ss, color="black", linewidth=1.2, linestyle='--',label='Steady State')
-    ax.set_title("Capital", fontsize=16)
+    #ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$k_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.yaxis.tick_right()       # move ticks to the right
+    ax.yaxis.set_label_position("right")
 
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -238,12 +240,12 @@ if run_simulation == "yes":
     ss_dev = (rl_ss - grid_ss) / np.abs(grid_ss)
     print(f"Consumption distance from steady state: {ss_dev*100:.2f}%")
 
-    fig, ax = plt.subplots(figsize=(5, 6))  
+    fig, ax = plt.subplots(figsize=(3.15, 6))  
     ax.plot(c_grid, color='#003f5c', linewidth=1.5, label='Grid', zorder = 4)
     ax.plot(c_rl, color='#ff6600', linewidth=1.5, label='RL', zorder = 5)
     ax.plot(irf_ci, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(c_ss, color="black", linewidth=1.2, linestyle='--', label='Steady State')
-    ax.set_title("Consumption", fontsize=16)
+    #ax.set_title("Consumption", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
@@ -439,19 +441,21 @@ if global_policy == "yes":
 
     #plotting
     #consumption
-    fig, ax = plt.subplots(figsize=(5, 6))
+    fig, ax = plt.subplots(figsize=(3.15, 6))
     ax.plot(k_values, c_values[:, 0], color='#ff6600', linewidth=1.5, label='RL', zorder = 4)
     ax.plot(k_values, c_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, c_ss, color='black', label='Steady State', s=20, zorder=5)
     ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.axhline(c_ss, color='black', linestyle=':', linewidth=1)
-    ax.set_title("Consumption Rule", fontsize=16)
+    #ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
     #ax.legend()          
     ax.grid(axis='both', alpha=0.5)                         
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
+    ax.yaxis.tick_right()       # move ticks to the right
+    ax.yaxis.set_label_position("right")
     
     fig.autofmt_xdate() 
     plt.tight_layout()
@@ -460,13 +464,13 @@ if global_policy == "yes":
 
 
     #value function
-    fig, ax = plt.subplots(figsize=(5, 6))
+    fig, ax = plt.subplots(figsize=(3.15, 6))
     ax.plot(k_values, v_values[:, 0], color='#ff6600', linewidth=1.5, label='RL', zorder = 4)
     ax.plot(k_values, v_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
     ax.scatter(k_ss, v_ss, color='black', label='Steady State', s=20, zorder=5)
     ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
     ax.axhline(v_ss, color='black', linestyle=':', linewidth=1)
-    ax.set_title("Value Function", fontsize=16)
+    #ax.set_title("Value Function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$V(k_t)$', fontstyle='italic')
     #ax.legend()          
