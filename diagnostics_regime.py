@@ -18,8 +18,8 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_steady_regime.pt' 
-grid_model = 'Grid_SGM_regime.pkl'
+rl_model = 'SGM_onepct_steady_regime.pt' 
+grid_model = 'Grid_SGM_regime_onepct.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
@@ -319,18 +319,32 @@ if run_simulation == "yes":
     # Plotting Euler residuals 
     resids = [entry['resid'] for entry in foc_sim.values()]
 
-    fig, ax = plt.subplots(figsize=(5, 6))  
-    ax.plot(resids, color='#003f5c', linewidth=1.0, alpha = 0.3,  label='RL')
+    """ with open("resids_high.pkl", "wb") as f:
+        pickle.dump(resids, f) """
+    
+    with open("resids_high.pkl",'rb') as f:
+        resids_high = pickle.load(f)
 
+    fig, ax = plt.subplots(figsize=(5, 6)) 
+    ax.plot(resids, color='#5d95ad', linewidth=1.0, alpha = 0.3,  label='RL')
     alpha = 0.1  # Smoothing parameter
     smoothed_euler_gap = np.zeros_like(resids)
     smoothed_euler_gap[0] = resids[0]
     for i in range(1, len(resids)):
         smoothed_euler_gap[i] = alpha * resids[i] + (1 - alpha) * smoothed_euler_gap[i - 1]
-    
-    ax.plot(smoothed_euler_gap, color='#003f5c', linewidth=1.5, label='Smoothed RL')
+    ax.plot(smoothed_euler_gap, color='#5d95ad', linewidth=1.5, label='Smoothed RL')
 
-    ax.set_title("Euler residuals", fontsize=16)
+    #high #2f6d89
+    ax.plot(resids_high, color='#003f5c', linewidth=1.0, alpha = 0.3,  label='RL')
+    smoothed_euler_gap_high = np.zeros_like(resids)
+    smoothed_euler_gap_high[0] = resids[0]
+    for i in range(1, len(resids_high)):
+        smoothed_euler_gap_high[i] = alpha * resids_high[i] + (1 - alpha) * smoothed_euler_gap_high[i - 1]
+    ax.plot(smoothed_euler_gap_high, color='#003f5c', linewidth=1.5, label='Smoothed RL')
+    
+
+
+    #ax.set_title("Euler residuals", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$Euler \ \ Residuals$', fontstyle='italic')
     #ax.legend()          

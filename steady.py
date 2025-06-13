@@ -15,7 +15,7 @@ class steady:
         self.actions = 1
         self.nbz = 11          #dimension of the quadrature
         self.nbr = 2           # number of regimes 
-        self.tau = 0.95        # tax 
+        self.tau = 0.99        # tax 
         self.pi_tau = 0.004    # probability that tax s introduced
 
     
