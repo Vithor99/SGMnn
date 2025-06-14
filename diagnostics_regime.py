@@ -19,17 +19,17 @@ warnings.filterwarnings("ignore")
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
 rl_model = 'SGM_onepct_steady_regime.pt' 
-grid_model = 'Grid_SGM_regime_onepct.pkl'
+grid_model = 'Grid_SGM_regime_onepct_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
 
-run_simulation = "yes" #if yes it runs the simulation
+run_simulation = "no" #if yes it runs the simulation
 
 run_policy = "no" # if yes it runs the policy evaluation
 
-global_policy = "no" #needs to be run with appropriate grid solution
+global_policy = "yes" #needs to be run with appropriate grid solution
 
 #run_add_analysis = "no" # if yes it runs some other stuff
 
@@ -594,6 +594,8 @@ if global_policy == "yes":
     for i in range(len(v_values_rl[0,:])):
         ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, v_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
+    ax.scatter(k_ss_rl, v_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     #ax.set_title("Value Function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$v_t$', fontstyle='italic')
