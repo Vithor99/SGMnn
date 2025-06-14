@@ -236,7 +236,7 @@ for iter in tqdm(range(EPOCHS)):
         last_cons /= n_eval 
         random_util /= n_eval
 
-        writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap*100, iter) 
+        writer.add_scalar("pct distance from opt consumption ratio (euler)", euler_gap, iter) 
         writer.add_scalar("pct welfare gain of steady state to current policy (test)", ((vss_test-total_utility)/total_utility)*100 , iter)
         writer.add_scalar("pct welfare gain of current policy to random policy", ((total_utility-random_util)/random_util)*100 , iter) 
         writer.add_scalar("pct distance of k to k_ss", (np.abs(last_state - k_ss)/k_ss)*100, iter)
