@@ -17,17 +17,17 @@ warnings.filterwarnings("ignore")
 
 '''CONTROLS'''
 rl_model = 'SGM_steady_deterministic.pt' 
-grid_model = 'Grid_SGM_deterministic.pkl'
+grid_model = 'Grid_SGM_deterministic_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
 
-run_simulation = "yes" #if yes it runs the simulation
+run_simulation = "no" #if yes it runs the simulation
 
 run_policy = "no" # if yes it runs the policy evaluation
 
 run_policy_sto = "no"
 
-global_policy = "no"
+global_policy = "yes"
 
 
 '''LOADING MODELS'''
@@ -52,7 +52,7 @@ args = parser.parse_args()
 device = torch.device('cpu')
 ''' Define Simulator'''
 c_ss, k_ss, y_ss, u_ss, v_ss = ss.ss()
-
+a_ss = (1 - (c_ss/y_ss))
 state_dim = ss.states
 action_dim = ss.actions
 alpha = ss.alpha
@@ -404,7 +404,7 @@ if global_policy == "yes":
     N = 200
     dev = 20
     c_values = np.zeros((N, 2))
-    n_values = np.zeros((N, 2))
+    a_values = np.zeros((N, 2))
     k1_values = np.zeros((N, 2))
     v_values = np.zeros((N, 2))
     k_values = np.linspace(1, k_ss * (1+(dev/100)), N)
@@ -420,6 +420,7 @@ if global_policy == "yes":
             value_rl = value_tensor.numpy()
         y_rl = (k_values[i]**ss.alpha)
         c_rl = (1 - action_rl) * y_rl
+        a_rl = action_rl
         k1_rl = (1 - ss.delta)*k_values[i] + action_rl * y_rl
         v_rl = float(value_rl)
 
@@ -427,8 +428,10 @@ if global_policy == "yes":
         c_grid = float(optimal_c(k_values[i]))
         k1_grid = float(optimal_k1(k_values[i]))
         v_grid = float(optimal_v(k_values[i]))
+        a_grid = float(optimal_a(k_values[i]))
         #save 
         c_values[i] = [c_rl, c_grid]
+        a_values[i] = [a_rl, a_grid]
         k1_values[i] = [k1_rl, k1_grid]
         v_values[i] = [v_rl, v_grid]
 
@@ -484,4 +487,24 @@ if global_policy == "yes":
     fig.savefig(plot_path)
 
 
-
+#saving rate
+    fig, ax = plt.subplots(figsize=(5, 6))
+    ax.plot(k_values, a_values[:, 0], color='#ff6600', linewidth=1.5, label='RL', zorder = 4)
+    ax.plot(k_values, a_values[:, 1], color='#003f5c', linewidth=1.5, label='Grid')
+    ax.scatter(k_ss, a_ss, color='black', label='Steady State', s=20, zorder=5)
+    ax.axvline(k_ss, color='black', linestyle=':', linewidth=1)
+    ax.axhline(a_ss, color='black', linestyle=':', linewidth=1)
+    #ax.set_title("Consumption Rule", fontsize=16)
+    ax.set_xlabel(r'$k_t$', fontstyle='italic')         
+    ax.set_ylabel(r'$a_t$', fontstyle='italic')
+    #ax.legend()          
+    ax.grid(axis='both', alpha=0.5)                         
+    ax.tick_params(axis='x', direction='in')
+    ax.tick_params(axis='y', direction='in')
+    ax.yaxis.tick_right()       # move ticks to the right
+    ax.yaxis.set_label_position("right")
+    
+    fig.autofmt_xdate() 
+    plt.tight_layout()
+    plot_path = folder + rl_model.replace('.pt', '_global_saving.png')
+    fig.savefig(plot_path)
