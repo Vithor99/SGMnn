@@ -25,11 +25,11 @@ folder = 'SGM_plots/'
 
 #zoom = "in" #this needs to be adjusted
 
-run_simulation = "no" #if yes it runs the simulation
+run_simulation = "yes" #if yes it runs the simulation
 
 run_policy = "no" # if yes it runs the policy evaluation
 
-global_policy = "yes" #needs to be run with appropriate grid solution
+global_policy = "no" #needs to be run with appropriate grid solution
 
 #run_add_analysis = "no" # if yes it runs some other stuff
 
@@ -127,7 +127,14 @@ for t in range(1000):
     k_rl = k1_rl
 k_ss_rl_ante = np.mean(K[-100:])
 c_ss_rl_ante = np.mean(C[-100:])
-v_ss_rl_ante = (1 / (1 - ss.beta)) * np.mean(U[-100:])
+
+st = np.array([rgrid[0], k_ss_rl_ante])
+state = torch.from_numpy(st).float().to(device)
+with torch.no_grad():
+    value_tensor = agent.get_value(state)
+    value_rl = value_tensor.numpy()
+#v_ss_rl_ante = (1 / (1 - ss.beta)) * np.mean(U[-100:])
+v_ss_rl_ante = value_rl
 
 k_rl = k_ss
 K = np.zeros(1000)
@@ -146,9 +153,19 @@ for t in range(1000):
     C[t] = c_rl
     U[t] = u_rl
     k_rl = k1_rl
+
 k_ss_rl = np.mean(K[-100:])
 c_ss_rl = np.mean(C[-100:])
-v_ss_rl = (1 / (1 - ss.beta)) * np.mean(U[-100:])
+
+st = np.array([rgrid[1], k_ss_rl])
+state = torch.from_numpy(st).float().to(device)
+with torch.no_grad():
+    value_tensor = agent.get_value(state)
+    value_rl = value_tensor.numpy()
+v_ss_rl = value_rl
+#v_ss_rl = (1 / (1 - ss.beta)) * np.mean(U[-100:])
+
+
 ''' COMPUTING THE SS OF GRID BEFORE TAX '''
 k_grid = k_ss
 K = np.zeros(1000)
@@ -169,6 +186,9 @@ k_ss_ante = np.mean(K[-100:])
 c_ss_ante = np.mean(C[-100:])
 v_ss_ante = (1/(1-ss.beta)) * np.mean(U[-100:])
 
+''' NUMERICAL RESULTS'''
+print(f"Pct Distance of c wrt ss before switch:{(c_ss_rl_ante - c_ss_ante)*100/(c_ss_ante)}")
+print(f"Pct Distance of c wrt ss after switch:{(c_ss_rl - c_ss)*100/(c_ss)}")
 
 ''' SIMULATION '''
 if run_simulation == "yes":
@@ -360,7 +380,7 @@ if run_simulation == "yes":
 
     #vss = ss.ss_value(T)
     print(f"Steady state value = {v_ss}; Value reached by Grid = {grid_v}; ; Value reached by RL = {rl_v}")
-    print(f"Pct welfare gain of RL to grid:{(rl_v - grid_v)*100/(grid_v)}") 
+    print(f"Pct welfare gain of grid to RL:{(grid_v - rl_v)*100/(rl_v)}") 
 
 
 
