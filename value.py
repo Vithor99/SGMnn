@@ -20,6 +20,7 @@ warnings.filterwarnings("ignore")
 '''CONTROLS'''
 rl_model = 'SGM_steady_regime.pt' 
 folder = 'SGM_plots/'
+run_VFI = "no"
 
 
 '''LOADING RL MODEL'''
@@ -90,8 +91,14 @@ for t in range(1000):
 k_ss_rl = np.mean(K[-100:])
 c_ss_rl = np.mean(C[-100:])
 u_ss_rl = np.mean(U[-100:])
-v_ss_rl = (u_ss_rl / (1 - ss.beta))
 
+
+st = np.array([1, k_ss_rl])
+state = torch.from_numpy(st).float().to(device)
+with torch.no_grad():
+    value_tensor = agent.get_value(state)
+    value_rl = value_tensor.numpy()
+v_ss_rl = value_rl
 
 
 '''CONTROLS'''
@@ -101,7 +108,7 @@ nbk = 101       #number of of data points in state grid
 nba = 1001     #number of of data points in control grid
 
 crit = 1       #initial value for the value distance 
-epsi = 1e-3 #1e-3
+epsi = 1e-3    #1e-3
 
 '''MAKING THE GRIDS'''
 ss = steady()
@@ -118,58 +125,58 @@ nbr = ss.nbr
 rgrid = ss.regimes()[0]   # Discretized z values
 Pi = ss.regimes()[1]      # Transition probabilities
 
-#kmin = 1 
-kmin = (1 - (dev_k/100)) * k_ss_rl
+kmin = 1 
+#kmin = (1 - (dev_k/100)) * k_ss_rl
 kmax = (1 + (dev_k/100)) * k_ss_rl 
 kgrid = np.linspace(kmin, kmax, nbk)
 
 
 
+if run_VFI == "yes": 
+    '''VALUE FUNCTION ITERATION'''
+    v = np.zeros([nbk, nbr])       #initial guess for values linked to the state grid 
+    iter = 0
+    crit_hist = []
 
-'''VALUE FUNCTION ITERATION'''
-v = np.zeros([nbk, nbr])       #initial guess for values linked to the state grid 
-iter = 0
-crit_hist = []
-
-while crit > epsi:
-    tv = np.zeros([nbk, nbr])
-    #dr = np.zeros([nbk, nbz]).astype(int)
-    for i in range(nbk):
-        for j in range(nbr): 
-            st = np.array([rgrid[j], kgrid[i]])
-            state_rl = torch.from_numpy(st).float().to(device)
-            with torch.no_grad():
-                action_tensor, _ = agent.get_action(state_rl, test=True)
-                sratio_rl = action_tensor.squeeze().numpy()
-            y = rgrid[j] * (kgrid[i]**ss.alpha)
-            control = (1 - sratio_rl) * y
-            kp = y + (1-delta)*kgrid[i] - control
-            util = gamma * np.log(control) #+ psi * np.log(1 - control[:,1])
-            vfunc = interp(kgrid, v)
-            vi = vfunc(kp)
-            EV = vi @ Pi[j,:].reshape(-1,1)
-            val = util + beta * EV
-            tv[i,j] = val
-    
-    crit = max(abs(tv-v).flatten())
-    v = tv
-    conv = (crit/epsi)
-    iter += 1
-    if iter % 10 == 0: 
-        print(f"Iteration {iter}, crit: {conv}")
-print(f"Final iteration: {iter}, crit: {conv}")
-
-
-v_star = vfunc(kgrid)
-
-data_to_save = {
-    'st': kgrid,
-    'value_star': v_star
-}
+    while crit > epsi:
+        tv = np.zeros([nbk, nbr])
+        #dr = np.zeros([nbk, nbz]).astype(int)
+        for i in range(nbk):
+            for j in range(nbr): 
+                st = np.array([rgrid[j], kgrid[i]])
+                state_rl = torch.from_numpy(st).float().to(device)
+                with torch.no_grad():
+                    action_tensor, _ = agent.get_action(state_rl, test=True)
+                    sratio_rl = action_tensor.squeeze().numpy()
+                y = rgrid[j] * (kgrid[i]**ss.alpha)
+                control = (1 - sratio_rl) * y
+                kp = y + (1-delta)*kgrid[i] - control
+                util = gamma * np.log(control) #+ psi * np.log(1 - control[:,1])
+                vfunc = interp(kgrid, v)
+                vi = vfunc(kp)
+                EV = vi @ Pi[j,:].reshape(-1,1)
+                val = util + beta * EV
+                tv[i,j] = val
+        
+        crit = max(abs(tv-v).flatten())
+        v = tv
+        conv = (crit/epsi)
+        iter += 1
+        if iter % 10 == 0: 
+            print(f"Iteration {iter}, crit: {conv}")
+    print(f"Final iteration: {iter}, crit: {conv}")
 
 
-with open("V.pkl", 'wb') as f:
-    pickle.dump(data_to_save, f)
+    v_star = vfunc(kgrid)
+
+    data_to_save = {
+        'st': kgrid,
+        'value_star': v_star
+    }
+
+
+    with open("V.pkl", 'wb') as f:
+        pickle.dump(data_to_save, f)
 
 # Loading Grid (vi) policy
 with open("V.pkl", 'rb') as f:
@@ -186,18 +193,12 @@ for i in range(len(rgrid)):
 plt.show()
 
 
-
-
-
-
-
-
-
-
+v_ss_rl_true = optimal_v(np.array([1, k_ss_rl]))
 
 ''' POLICY EVALUATION STOCHASTIC'''
 #k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
-k_values = kgrid
+#k_values = kgrid
+k_values = k
 N = nbk
 
 c_values_grid = np.zeros((N, ss.nbr))
@@ -238,12 +239,15 @@ for j in range(ss.nbr):
 fig, ax = plt.subplots(figsize=(5, 6))
 palette = ("#ff6600", "#ffb84d")
 for i in range(len(v_values_rl[0,:])):
-    ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
-    ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
+    ax.plot(k_values, (v_values_rl[:, i] - v_values_grid[:, i])/v_values_grid[:, i] , color = palette[i],  linewidth=1.5)
+    #ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
+    #ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
 
-ax.set_title("Value Function", fontsize=16)
+#ax.set_title("Value Function", fontsize=16)
+ax.scatter(k_ss_rl, (v_ss_rl - v_ss_rl_true)/v_ss_rl_true, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=30, linewidths=1.5, zorder = 5)
+ax.axvline(k_ss_rl, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
 ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-ax.set_ylabel(r'$v_t$', fontstyle='italic')
+ax.set_ylabel(r'$\hat V^\pi \ \ / \ \ V^\pi$', fontstyle='italic')
 #ax.legend()          
 ax.grid(axis='both', alpha=0.5)                         
 ax.tick_params(axis='x', direction='in')
@@ -251,6 +255,7 @@ ax.tick_params(axis='y', direction='in')
 
 fig.autofmt_xdate() 
 plt.tight_layout()
-plot_path = folder + rl_model.replace('.pt', '_true_value.png')
+plot_path = folder + rl_model.replace('.pt', '_true_value_local.png')
 fig.savefig(plot_path)
+
 
