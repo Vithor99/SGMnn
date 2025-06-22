@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
-rl_model = 'SGM_lowvar_steady_stochastic.pt' 
+rl_model = 'SGM_steady_stochastic.pt' 
 #grid_model = 'Grid_SGM_stochastic_lowvar_global.pkl'
 #folder to store plots 
 folder = 'SGM_plots/'
@@ -94,52 +94,95 @@ c_ss_rl = np.mean(C[-100:])
 u_ss_rl = np.mean(U[-100:])
 v_ss_rl = (u_ss_rl / (1 - ss.beta))
 
-''' COMPUTE THE TRUE VALUE OF THE POLICY '''
-#1 we need 11 levels of productivity and 100 levels of capital around a 20% interval from the steady state 
-#3 Monte Carlo simulate from 100 x 11 initial states TxN time, where T = 550 and N = 100.  
-#4 we end up with 100 x 11 values, interpolate the 100 points to get a value function for each level of z. 
-#0
-dev = 0.2
-grid = 100
-N = 100
-#1 
-zgrid = ss.tauchenhussey(N=ss.nbz)[0]
-kgrid = np.linspace((1-dev) * k_ss_rl, (1+dev) * k_ss_rl, grid)
 
-V = np.zeros((len(kgrid), len(zgrid)))
-#3 
-for j in range(len(zgrid)): 
-    for i in range(len(kgrid)): 
-        exp_v = 0
-        for n in range(N):
+
+'''CONTROLS'''
+dev_k= 20      #deviation from steady state in percent
+
+nbk = 101       #number of of data points in state grid
+nba = 1001     #number of of data points in control grid
+
+crit = 1       #initial value for the value distance 
+epsi = 1e-3 #1e-3
+
+'''MAKING THE GRIDS'''
+ss = steady()
+c_ss, ks, y_ss, u_ss, v_ss = ss.ss()
+sr_ss = 1 - (c_ss/y_ss)
+delta = ss.delta
+beta = ss.beta
+alpha = ss.alpha
+#psi = ss.psi
+gamma = ss.gamma
+
+
+nbz = ss.nbz
+zgrid = ss.tauchenhussey(N=nbz)[0]   # Discretized z values
+Pi = ss.tauchenhussey(N=nbz)[1]      # Transition probabilities
+
+#kmin = 1 
+kmin = (1 - (dev_k/100)) * k_ss_rl
+kmax = (1 + (dev_k/100)) * k_ss_rl 
+kgrid = np.linspace(kmin, kmax, nbk)
+
+
+
+
+'''VALUE FUNCTION ITERATION'''
+v = np.zeros([nbk, nbz])       #initial guess for values linked to the state grid 
+iter = 0
+crit_hist = []
+
+while crit > epsi:
+    tv = np.zeros([nbk, nbz])
+    #dr = np.zeros([nbk, nbz]).astype(int)
+    for i in range(nbk):
+        for j in range(nbz): 
             st = np.array([zgrid[j], kgrid[i]])
-            rl_v = 0
-            for t in range(550):
-                state_rl = torch.from_numpy(st).float().to(device)
-                with torch.no_grad():
-                    action_tensor, _ = agent.get_action(state_rl, test=True)
-                    sratio_rl = action_tensor.squeeze().numpy()
-                k_rl = st[1]
-                z = st[0]
-                c_rl = z * (k_rl**ss.alpha) * (1-sratio_rl)
-                u_rl = ss.gamma*np.log(c_rl)
-                k1_rl = (1 - ss.delta)*k_rl + sratio_rl * z * (k_rl**ss.alpha)
-                rl_v += ss.beta**t * u_rl
-                z1 = (1 - ss.rhoa) + ss.rhoa * z + np.random.normal(0, ss.dev_eps_z)
-                st = np.array([z1, k1_rl])
-            exp_v += (1/N) * rl_v
-        V[i,j] = exp_v
-    print(j)
-
-with open('V.pkl', 'wb') as f:
-    pickle.dump(V, f)
-with open('V.pkl', 'rb') as f:
-    V = pickle.load(f)
+            state_rl = torch.from_numpy(st).float().to(device)
+            with torch.no_grad():
+                action_tensor, _ = agent.get_action(state_rl, test=True)
+                sratio_rl = action_tensor.squeeze().numpy()
+            y = zgrid[j] * (kgrid[i]**ss.alpha)
+            control = (1 - sratio_rl) * y
+            kp = y + (1-delta)*kgrid[i] - control
+            util = gamma * np.log(control) #+ psi * np.log(1 - control[:,1])
+            vfunc = interp(kgrid, v)
+            vi = vfunc(kp)
+            EV = vi @ Pi[j,:].reshape(-1,1)
+            val = util + beta * EV
+            tv[i,j] = val
     
-optimal_v = interp2d((zgrid, kgrid), V.T)
+    crit = max(abs(tv-v).flatten())
+    v = tv
+    conv = (crit/epsi)
+    iter += 1
+    if iter % 10 == 0: 
+        print(f"Iteration {iter}, crit: {conv}")
+print(f"Final iteration: {iter}, crit: {conv}")
 
 
+v_star = vfunc(kgrid)
 
-st = np.column_stack((np.ones_like(kgrid)*zgrid[5], kgrid))
-plt.plot(kgrid, optimal_v(st))
+data_to_save = {
+    'st': kgrid,
+    'value_star': v_star
+}
+
+
+with open("V.pkl", 'wb') as f:
+    pickle.dump(data_to_save, f)
+
+# Loading Grid (vi) policy
+with open("V.pkl", 'rb') as f:
+    loaded_data = pickle.load(f)
+
+k = loaded_data['st']
+value_star = loaded_data['value_star']
+
+optimal_v = interp2d((zgrid, k), value_star.T)
+
+for i in range(len(zgrid)):
+    st = np.column_stack((np.ones_like(k)*zgrid[i], k))
+    plt.plot(k, optimal_v(st))
 plt.show()
