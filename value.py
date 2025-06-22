@@ -92,9 +92,14 @@ for t in range(1000):
 k_ss_rl = np.mean(K[-100:])
 c_ss_rl = np.mean(C[-100:])
 u_ss_rl = np.mean(U[-100:])
-v_ss_rl = (u_ss_rl / (1 - ss.beta))
+#v_ss_rl = (u_ss_rl / (1 - ss.beta))
 
-
+st = np.array([1, k_ss_rl])
+state = torch.from_numpy(st).float().to(device)
+with torch.no_grad():
+    value_tensor = agent.get_value(state)
+    value_rl = value_tensor.numpy()
+v_ss_rl = value_rl
 
 '''CONTROLS'''
 dev_k= 20      #deviation from steady state in percent
@@ -121,7 +126,7 @@ zgrid = ss.tauchenhussey(N=nbz)[0]   # Discretized z values
 Pi = ss.tauchenhussey(N=nbz)[1]      # Transition probabilities
 
 #kmin = 1 
-kmin = 20
+kmin = 10
 #kmin = (1 - (dev_k/100)) * k_ss_rl
 kmax = (1 + (dev_k/100)) * k_ss_rl 
 kgrid = np.linspace(kmin, kmax, nbk)
@@ -241,7 +246,7 @@ ax.scatter(k_ss_rl, (v_ss_rl - v_ss_rl_true)/v_ss_rl_true, marker='o', facecolor
 ax.axvline(k_ss_rl, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
 #ax.set_title("Value function", fontsize=16)
 ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-ax.set_ylabel(r'$v_t\% \ \ \ diff.$', fontstyle='italic')
+ax.set_ylabel(r'$\hat V^\pi \ \ / \ \ V^\pi$', fontstyle='italic')
 #ax.set_ylim(-0.002, 0.002)
 #ax.legend()          
 ax.grid(axis='both', alpha=0.5)                         
