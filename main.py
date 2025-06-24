@@ -5,7 +5,6 @@ import pickle
 import os
 from simulation import Model
 from rl_algos.actor_critic import ActorCritic
-from rl_algos.soft_actor_critic import SoftActorCritic
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
@@ -16,7 +15,6 @@ from gymnasium.vector import SyncVectorEnv
 
 '''CONTROLS'''
 comment = '_SGM_'
-comment = '_SGM_debug_'
 #working version
 version = "deterministic" # deterministic ; stochastic  
 initial_k = "steady"      # steady ; random 

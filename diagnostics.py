@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import pickle
 from simulation import Model
 from rl_algos.actor_critic import ActorCritic
-from rl_algos.soft_actor_critic import SoftActorCritic
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
@@ -118,12 +117,10 @@ if run_simulation == "yes":
     st = np.array([k_ss*(1+(dev/100)), k_ss*(1+(dev/100))])
     k0_rl_i = np.ones(100) *  k_ss*(1+(dev/100))
     z = 1 #we want the same series for productivity in the two economies
-    #z_psx = int(np.where(zgrid == 1)[0])
     grid_sim={}
     rl_sim={}
     grid_v = 0
     rl_v = 0
-    #labour_gap = np.zeros((T-1, 2))
     euler_gap = np.zeros((T-1, 2))
     irf_ci = np.zeros((T, 100))
     irf_ki = np.zeros((T, 100))
@@ -150,8 +147,6 @@ if run_simulation == "yes":
         c_rl = y_rl * (1-sratio_rl)
         u_rl = ss.gamma*np.log(c_rl)
         k1_rl = (1 - ss.delta)*k_rl + y_rl - c_rl
-        #st1_rl = (1-ss.delta)*st[1] + st[0]*(action_rl[1]**(1-ss.alpha))*(st[1]**ss.alpha) - action_rl[0]
-        #u_rl = ss.gamma*np.log(action_rl[0]) + ss.psi*np.log(1-action_rl[1])
         rl_v += ss.beta**t * u_rl
         rl_sim[t] = {'k': k_rl,
                     'c': c_rl,
@@ -167,8 +162,6 @@ if run_simulation == "yes":
         irf_ki[t] = k1_rl_i
 
         #Grid 
-        # Find the position of the value 1 in zgrid
-        #a = np.array([ss.get_consumption(k[1], 1, float(optimal_n(k[1])[z_psx])), float(optimal_n(k[1])[z_psx])])
         k_grid = st[1]
         y_grid = z* (k_grid**ss.alpha)
         c_grid = float(optimal_c(k_grid))
@@ -189,15 +182,12 @@ if run_simulation == "yes":
             
             e_gap_rl = ss.foc_log(rl_sim[t-1]['c'], rl_sim[t]['c'],  
                                     z, rl_sim[t]['k'])
-            #labour_gap[t-1, 1] = l_gap
             euler_gap[t-1, 0] = e_gap_rl
             euler_gap[t-1, 1] = e_gap_grid
 
         st = np.array([k1_rl, k1_grid])
         k0_rl_i = k1_rl_i
-        #z1_psx = int(np.random.choice(ss.nbz, p=Pi[z_psx,:]))
-        #z_psx = z1_psx
-        #z = zgrid[z_psx]
+        
 
     #Plotting
     #capital
