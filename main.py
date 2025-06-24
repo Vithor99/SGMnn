@@ -5,7 +5,6 @@ import pickle
 import os
 from simulation import Model
 from rl_algos.actor_critic import ActorCritic
-from rl_algos.soft_actor_critic import SoftActorCritic
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
@@ -15,8 +14,7 @@ from gymnasium.envs.registration import register
 from gymnasium.vector import SyncVectorEnv
 # baseline version is now: 2 states, beta = 0.97 and delta = 0.01
 '''CONTROLS'''
-comment = 'SGM_prepoc3_'
-#comment = 'SGM_debug_'
+comment = 'SGM_'
 
 #working version
 version = "regime" 

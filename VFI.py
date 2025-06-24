@@ -19,7 +19,6 @@ warnings.filterwarnings("ignore")
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
 rl_model = 'SGM_steady_regime.pt' 
-#rl_model = 'SGM_onepct_steady_regime.pt' 
 folder = 'SGM_plots/'
 run_VFI = "yes"
 
@@ -76,7 +75,7 @@ nbr = ss.nbr
 rgrid = ss.regimes()[0]   # Discretized z values
 Pi = ss.regimes()[1]      # Transition probabilities
 
-'EX-POST'
+'S2'
 k_rl = k_ss
 K = np.zeros(1000)
 C = np.zeros(1000)
@@ -106,8 +105,7 @@ with torch.no_grad():
     value_rl = value_tensor.numpy()
 v_ss_rl = value_rl
 
-'EX_ANTE'
-
+'S1'
 k_rl = k_ss
 K = np.zeros(1000)
 C = np.zeros(1000)
@@ -136,11 +134,9 @@ v_ss_rl_ante = value_rl
 
 
 '''CONTROLS'''
-dev_k= 5      #deviation from steady state in percent
-
-nbk = 101       #number of of data points in state grid
+dev_k= 5       #deviation from steady state in percent
+nbk = 101      #number of of data points in state grid
 nba = 1001     #number of of data points in control grid
-
 crit = 1       #initial value for the value distance 
 epsi = 1e-3    #1e-3
 
@@ -151,9 +147,7 @@ sr_ss = 1 - (c_ss/y_ss)
 delta = ss.delta
 beta = ss.beta
 alpha = ss.alpha
-#psi = ss.psi
 gamma = ss.gamma
-
 
 #kmin = 1 
 kmin = (1 - (dev_k/100)) * ((k_ss_rl+k_ss_rl_ante)/2)
@@ -161,16 +155,14 @@ kmax = (1 + (dev_k/100)) * ((k_ss_rl+k_ss_rl_ante)/2)
 kgrid = np.linspace(kmin, kmax, nbk)
 
 
-
+'''VALUE FUNCTION ITERATION'''
 if run_VFI == "yes": 
-    '''VALUE FUNCTION ITERATION'''
     v = np.zeros([nbk, nbr])       #initial guess for values linked to the state grid 
     iter = 0
     crit_hist = []
 
     while crit > epsi:
         tv = np.zeros([nbk, nbr])
-        #dr = np.zeros([nbk, nbz]).astype(int)
         for i in range(nbk):
             for j in range(nbr): 
                 st = np.array([rgrid[j], kgrid[i]])
@@ -181,7 +173,7 @@ if run_VFI == "yes":
                 y = rgrid[j] * (kgrid[i]**ss.alpha)
                 control = (1 - sratio_rl) * y
                 kp = y + (1-delta)*kgrid[i] - control
-                util = gamma * np.log(control) #+ psi * np.log(1 - control[:,1])
+                util = gamma * np.log(control) 
                 vfunc = interp(kgrid, v)
                 vi = vfunc(kp)
                 EV = vi @ Pi[j,:].reshape(-1,1)
@@ -196,15 +188,11 @@ if run_VFI == "yes":
             print(f"Iteration {iter}, crit: {conv}")
     print(f"Final iteration: {iter}, crit: {conv}")
 
-
     v_star = vfunc(kgrid)
-
     data_to_save = {
         'st': kgrid,
         'value_star': v_star
     }
-
-
     with open("V.pkl", 'wb') as f:
         pickle.dump(data_to_save, f)
 
@@ -214,21 +202,15 @@ with open("V.pkl", 'rb') as f:
 
 k = loaded_data['st']
 value_star = loaded_data['value_star']
-
 optimal_v = interp2d((rgrid, k), value_star.T)
-
-for i in range(len(rgrid)):
-    st = np.column_stack((np.ones_like(k)*rgrid[i], k))
-    plt.plot(k, optimal_v(st))
-plt.show()
-
 
 v_ss_rl_true = optimal_v(np.array([rgrid[1], k_ss_rl]))
 v_ss_rl_true_ante = optimal_v(np.array([rgrid[0], k_ss_rl_ante]))
 
+
+
+
 ''' POLICY EVALUATION STOCHASTIC'''
-#k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
-#k_values = kgrid
 k_values = k
 N = nbk
 
@@ -239,7 +221,6 @@ c_values_rl = np.zeros((N, ss.nbr))
 k1_values_rl = np.zeros((N, ss.nbr))
 v_values_rl = np.zeros((N, ss.nbr))
 
-#z_psx = int(np.where(zgrid == 1)[0])
 for j in range(ss.nbr): 
     for i in range(len(k_values)):
         #RL 
@@ -271,17 +252,11 @@ fig, ax = plt.subplots(figsize=(3.15, 6))
 palette = ("#ff6600", "#ffb84d")
 for i in range(len(v_values_rl[0,:])):
     ax.plot(k_values, (v_values_rl[:, i] - v_values_grid[:, i])/v_values_grid[:, i] , color = palette[i],  linewidth=1.5)
-    #ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
-    #ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
-
-#ax.set_title("Value Function", fontsize=16)
 ax.scatter(k_ss_rl, (v_ss_rl - v_ss_rl_true)/v_ss_rl_true, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=30, linewidths=1.5, zorder = 5)
 ax.scatter(k_ss_rl_ante, (v_ss_rl_ante - v_ss_rl_true_ante)/v_ss_rl_true_ante, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=30, linewidths=1.5, zorder = 5)
-
 ax.axvline(k_ss_rl, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
 ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-ax.set_ylabel(r'$v_t\% \ \ \ diff.$', fontstyle='italic')
-#ax.legend()          
+ax.set_ylabel(r'$v_t\% \ \ \ diff.$', fontstyle='italic')          
 ax.grid(axis='both', alpha=0.5)                         
 ax.tick_params(axis='x', direction='in')
 ax.tick_params(axis='y', direction='in')

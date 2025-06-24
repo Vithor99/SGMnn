@@ -31,8 +31,6 @@ class steady:
         c_ss, k_ss = solution
         y_ss = self.tau * (k_ss**self.alpha)
         u_ss = self.gamma*np.log(c_ss)
-        #v_ss = (1/(1-self.beta))*u_ss
-        #v_ss = 35.37 #see RBCvi for comuptation
         v_ss = (1/(1-self.beta)) * u_ss
         return c_ss, k_ss, y_ss, u_ss, v_ss 
     

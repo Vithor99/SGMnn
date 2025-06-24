@@ -5,11 +5,3 @@
     d) hyperparameter search architetura modello
     e) migliorare policy gradient (PPO, DDPG, PG fatto un po meglio)
     f) fare esplorazione meglio
-
-2) simulazioni piu high-dimensional and stochastic
-
-3) Cluster TSE 
-
-Debugging) changes: 
-    1. utils line 12 
-    2. 

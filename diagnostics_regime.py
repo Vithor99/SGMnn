@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import pickle
 from simulation import Model
 from rl_algos.actor_critic import ActorCritic
-from rl_algos.soft_actor_critic import SoftActorCritic
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import argparse
@@ -20,10 +19,8 @@ warnings.filterwarnings("ignore")
 '''CONTROLS'''
 rl_model = 'SGM_onepct_steady_regime.pt' 
 grid_model = 'Grid_SGM_regime_onepct_global.pkl'
-#folder to store plots 
 folder = 'SGM_plots/'
 
-#zoom = "in" #this needs to be adjusted
 
 run_simulation = "yes" #if yes it runs the simulation
 
@@ -31,7 +28,7 @@ run_policy = "no" # if yes it runs the policy evaluation
 
 global_policy = "no" #needs to be run with appropriate grid solution
 
-#run_add_analysis = "no" # if yes it runs some other stuff
+
 
 
 '''LOADING RL MODEL'''
@@ -296,10 +293,8 @@ if run_simulation == "yes":
     ax.plot(irf_ki, color = "#ff9440", linewidth= 0.5, alpha = 0.05, label='RL')
     ax.axhline(k_ss, color="#003f5c", linewidth=1.2, linestyle='--',label='Steady State')
     ax.axhline(k_ss_rl, color="#ff6600", linewidth=1.2, linestyle='--',label='Steady State RL')
-    #ax.set_title("Capital", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
-    ax.set_ylabel(r'$k_t$', fontstyle='italic')
-    #ax.legend()          
+    ax.set_ylabel(r'$k_t$', fontstyle='italic')  
     ax.grid(axis='both', alpha=0.5)                          
     ax.tick_params(axis='x', direction='in')
     ax.tick_params(axis='y', direction='in')
@@ -339,31 +334,15 @@ if run_simulation == "yes":
     # Plotting Euler residuals 
     resids = [entry['resid'] for entry in foc_sim.values()]
 
-    """ with open("resids_high.pkl", "wb") as f:
-        pickle.dump(resids, f) """
-    
-    with open("resids_high.pkl",'rb') as f:
-        resids_high = pickle.load(f)
-
     fig, ax = plt.subplots(figsize=(5, 6)) 
-    ax.plot(resids, color='#5d95ad', linewidth=1.0, alpha = 0.3,  label='RL')
+    ax.plot(resids, color='#003f5c', linewidth=1.0, alpha = 0.3,  label='RL')
     alpha = 0.1  # Smoothing parameter
     smoothed_euler_gap = np.zeros_like(resids)
     smoothed_euler_gap[0] = resids[0]
     for i in range(1, len(resids)):
         smoothed_euler_gap[i] = alpha * resids[i] + (1 - alpha) * smoothed_euler_gap[i - 1]
-    ax.plot(smoothed_euler_gap, color='#5d95ad', linewidth=1.5, label='Smoothed RL')
-
-    #high #2f6d89
-    ax.plot(resids_high, color='#003f5c', linewidth=1.0, alpha = 0.3,  label='RL')
-    smoothed_euler_gap_high = np.zeros_like(resids)
-    smoothed_euler_gap_high[0] = resids[0]
-    for i in range(1, len(resids_high)):
-        smoothed_euler_gap_high[i] = alpha * resids_high[i] + (1 - alpha) * smoothed_euler_gap_high[i - 1]
-    ax.plot(smoothed_euler_gap_high, color='#003f5c', linewidth=1.5, label='Smoothed RL')
+    ax.plot(smoothed_euler_gap, color='#003f5c', linewidth=1.5, label='Smoothed RL')
     
-
-
     #ax.set_title("Euler residuals", fontsize=16)
     ax.set_xlabel("Periods", fontstyle='italic')         
     ax.set_ylabel(r'$Euler \ \ Residuals$', fontstyle='italic')
@@ -446,17 +425,10 @@ if run_policy == "yes":
     for i in range(len(c_values_rl[0,:])):
         ax.plot(k_values, c_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, c_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
-    
-    """ ax.plot(k_values, c_values_rl[:, :], color = "#ff6600",  linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values_grid[:, :], color = "#003f5c", linewidth=1.5, label='Grid') """
     ax.scatter(k_ss, c_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_rl, c_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_rl_ante, c_ss_rl_ante, marker='D', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
     ax.scatter(k_ss_ante, c_ss_ante, marker='D', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.axvline(k_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axvline(k_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
     ax.set_title("Consumption Rule", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$c_t$', fontstyle='italic')
@@ -477,16 +449,6 @@ if run_policy == "yes":
         ax.plot(k_values, v_values_rl[:, i], color = palette[i],  linewidth=1.5, label='RL')
         ax.plot(k_values, v_values_grid[:, i], color = palette[i], linestyle = 'dashed', linewidth=1.5, label='Grid')
     
-    """ ax.plot(k_values, c_values_rl[:, :], color = "#ff6600",  linewidth=1.5, label='RL')
-    ax.plot(k_values, c_values_grid[:, :], color = "#003f5c", linewidth=1.5, label='Grid') """
-    #ax.scatter(k_ss, v_ss, marker='o', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.scatter(k_ss_rl, v_ss_rl, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.scatter(k_ss_rl_ante, v_ss_rl_ante, marker='D', facecolors='#003f5c', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.scatter(k_ss_ante, v_ss_ante, marker='D', facecolors='none', edgecolors='#003f5c', s=40, linewidths=1.5, zorder = 5)
-    #ax.axvline(k_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss, color='#003f5c', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axvline(k_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
-    #ax.axhline(c_ss_rl, color='#ff6600', linestyle=':', linewidth=1, alpha = 0.5)
     ax.set_title("Value Function", fontsize=16)
     ax.set_xlabel(r'$k_t$', fontstyle='italic')         
     ax.set_ylabel(r'$v_t$', fontstyle='italic')
@@ -538,10 +500,7 @@ if global_policy == "yes":
     k1_values_rl = np.zeros((N, ss.nbr))
     v_values_rl = np.zeros((N, ss.nbr))
 
-    #zgrid_small = np.array([zgrid[2], zgrid[5], zgrid[8]])
-
     k_values = np.linspace(1 , k_ss * (1.15), N)
-    #z_psx = int(np.where(zgrid == 1)[0])
     for j in range(ss.nbr): 
         for i in range(len(k_values)):
             #RL 
