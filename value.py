@@ -19,8 +19,9 @@ warnings.filterwarnings("ignore")
 # Be careful: steady must be alligned to what we are plotting here. 
 '''CONTROLS'''
 rl_model = 'SGM_steady_regime.pt' 
+#rl_model = 'SGM_onepct_steady_regime.pt' 
 folder = 'SGM_plots/'
-run_VFI = "no"
+run_VFI = "yes"
 
 
 '''LOADING RL MODEL'''
@@ -71,18 +72,23 @@ rl_model_path = 'saved_models/' + rl_model
 agent.load_state_dict(torch.load(rl_model_path, map_location=device))
 agent.eval()
 
+nbr = ss.nbr
+rgrid = ss.regimes()[0]   # Discretized z values
+Pi = ss.regimes()[1]      # Transition probabilities
+
+'EX-POST'
 k_rl = k_ss
 K = np.zeros(1000)
 C = np.zeros(1000)
 U = np.zeros(1000)
 for t in range(1000):
     #RL 
-    state_rl = torch.from_numpy(np.array([1, k_rl])).float().to(device)
+    state_rl = torch.from_numpy(np.array([rgrid[1], k_rl])).float().to(device)
     with torch.no_grad():
         action_tensor, _ = agent.get_action(state_rl, test=True)
         sratio_rl = action_tensor.squeeze().numpy()
-    k1_rl = (1 - ss.delta)*k_rl + (k_rl**ss.alpha) * sratio_rl
-    c_rl = (k_rl**ss.alpha) * (1 - sratio_rl)
+    k1_rl = (1 - ss.delta)*k_rl + rgrid[1]*(k_rl**ss.alpha) * sratio_rl
+    c_rl = rgrid[1]*(k_rl**ss.alpha) * (1 - sratio_rl)
     u_rl = np.log(c_rl)
     K[t] = k1_rl
     C[t] = c_rl
@@ -93,16 +99,44 @@ c_ss_rl = np.mean(C[-100:])
 u_ss_rl = np.mean(U[-100:])
 
 
-st = np.array([1, k_ss_rl])
+st = np.array([rgrid[1], k_ss_rl])
 state = torch.from_numpy(st).float().to(device)
 with torch.no_grad():
     value_tensor = agent.get_value(state)
     value_rl = value_tensor.numpy()
 v_ss_rl = value_rl
 
+'EX_ANTE'
+
+k_rl = k_ss
+K = np.zeros(1000)
+C = np.zeros(1000)
+U = np.zeros(1000)
+for t in range(1000):
+    #RL 
+    state_rl = torch.from_numpy(np.array([rgrid[0], k_rl])).float().to(device)
+    with torch.no_grad():
+        action_tensor, _ = agent.get_action(state_rl, test=True)
+        sratio_rl = action_tensor.squeeze().numpy()
+    k1_rl = (1 - ss.delta)*k_rl + rgrid[0]*(k_rl**ss.alpha) * sratio_rl
+    c_rl = rgrid[0]*(k_rl**ss.alpha) * (1 - sratio_rl)
+    u_rl = np.log(c_rl)
+    K[t] = k1_rl
+    C[t] = c_rl
+    U[t] = u_rl
+    k_rl = k1_rl
+k_ss_rl_ante = np.mean(K[-100:])
+
+st = np.array([rgrid[0], k_ss_rl_ante])
+state = torch.from_numpy(st).float().to(device)
+with torch.no_grad():
+    value_tensor = agent.get_value(state)
+    value_rl = value_tensor.numpy()
+v_ss_rl_ante = value_rl
+
 
 '''CONTROLS'''
-dev_k= 20      #deviation from steady state in percent
+dev_k= 5      #deviation from steady state in percent
 
 nbk = 101       #number of of data points in state grid
 nba = 1001     #number of of data points in control grid
@@ -121,13 +155,9 @@ alpha = ss.alpha
 gamma = ss.gamma
 
 
-nbr = ss.nbr
-rgrid = ss.regimes()[0]   # Discretized z values
-Pi = ss.regimes()[1]      # Transition probabilities
-
-kmin = 1 
-#kmin = (1 - (dev_k/100)) * k_ss_rl
-kmax = (1 + (dev_k/100)) * k_ss_rl 
+#kmin = 1 
+kmin = (1 - (dev_k/100)) * ((k_ss_rl+k_ss_rl_ante)/2)
+kmax = (1 + (dev_k/100)) * ((k_ss_rl+k_ss_rl_ante)/2) 
 kgrid = np.linspace(kmin, kmax, nbk)
 
 
@@ -193,7 +223,8 @@ for i in range(len(rgrid)):
 plt.show()
 
 
-v_ss_rl_true = optimal_v(np.array([1, k_ss_rl]))
+v_ss_rl_true = optimal_v(np.array([rgrid[1], k_ss_rl]))
+v_ss_rl_true_ante = optimal_v(np.array([rgrid[0], k_ss_rl_ante]))
 
 ''' POLICY EVALUATION STOCHASTIC'''
 #k_values = np.linspace(k_ss * (1-(dev/100)), k_ss * (1+(dev/100)), N)
@@ -236,7 +267,7 @@ for j in range(ss.nbr):
 #plotting
 
 #value
-fig, ax = plt.subplots(figsize=(5, 6))
+fig, ax = plt.subplots(figsize=(3.15, 6))
 palette = ("#ff6600", "#ffb84d")
 for i in range(len(v_values_rl[0,:])):
     ax.plot(k_values, (v_values_rl[:, i] - v_values_grid[:, i])/v_values_grid[:, i] , color = palette[i],  linewidth=1.5)
@@ -245,13 +276,16 @@ for i in range(len(v_values_rl[0,:])):
 
 #ax.set_title("Value Function", fontsize=16)
 ax.scatter(k_ss_rl, (v_ss_rl - v_ss_rl_true)/v_ss_rl_true, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=30, linewidths=1.5, zorder = 5)
+ax.scatter(k_ss_rl_ante, (v_ss_rl_ante - v_ss_rl_true_ante)/v_ss_rl_true_ante, marker='o', facecolors='#003f5c', edgecolors='#003f5c', s=30, linewidths=1.5, zorder = 5)
+
 ax.axvline(k_ss_rl, color='#003f5c', linewidth=1.2, linestyle='--', label='Steady State')
 ax.set_xlabel(r'$k_t$', fontstyle='italic')         
-ax.set_ylabel(r'$\hat V^\pi \ \ / \ \ V^\pi$', fontstyle='italic')
+ax.set_ylabel(r'$v_t\% \ \ \ diff.$', fontstyle='italic')
 #ax.legend()          
 ax.grid(axis='both', alpha=0.5)                         
 ax.tick_params(axis='x', direction='in')
 ax.tick_params(axis='y', direction='in')
+ax.set_ylim(-0.012, 0.023)
 
 fig.autofmt_xdate() 
 plt.tight_layout()
